@@ -1,5 +1,5 @@
 from datetime import datetime
-from . import db
+from app import db
 
 class Attendance(db.Model):
     """Attendance records for corps members"""

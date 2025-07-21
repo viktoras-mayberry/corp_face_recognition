@@ -1,5 +1,5 @@
 from datetime import datetime, date
-from . import db
+from app import db
 
 class CDSchedule(db.Model):
     """CD Schedule for managing which locations are active on specific dates"""

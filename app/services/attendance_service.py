@@ -1,5 +1,6 @@
 from datetime import datetime, date, timedelta
-from app.models import db, User, Attendance, Location, CDSchedule
+from app import db
+from app.models import User, Attendance, Location, CDSchedule
 from app.services.face_recognition_service import FaceRecognitionService
 import logging
 
@@ -128,6 +129,56 @@ class AttendanceService:
             logger.error(f"Error getting attendance history: {str(e)}")
             return []
 
+    def mark_attendance(self, user_id: int, schedule_id: int, method: str = 'manual') -> dict:
+        """Mark attendance for a user at a scheduled location"""
+        try:
+            # Get user and schedule
+            user = User.query.get(user_id)
+            schedule = CDSchedule.query.get(schedule_id)
+            
+            if not user:
+                return {'success': False, 'message': 'User not found'}
+            
+            if not schedule:
+                return {'success': False, 'message': 'Schedule not found'}
+            
+            if not schedule.can_mark_attendance():
+                return {'success': False, 'message': 'Cannot mark attendance for this schedule'}
+            
+            # Check if already marked for today
+            existing_attendance = Attendance.query.filter_by(
+                user_id=user_id,
+                location_id=schedule.location_id,
+                attendance_date=date.today()
+            ).first()
+            
+            if existing_attendance:
+                return {
+                    'success': False, 
+                    'message': f'Attendance already marked today at {existing_attendance.check_in_time.strftime("%H:%M")}'
+                }
+            
+            # Create attendance record
+            attendance = Attendance(
+                user_id=user_id,
+                location_id=schedule.location_id,
+                recognition_method=method,
+                status=self._determine_attendance_status()
+            )
+            
+            db.session.add(attendance)
+            db.session.commit()
+            
+            return {
+                'success': True,
+                'message': f'Attendance marked successfully for {user.full_name}',
+                'attendance_id': attendance.id
+            }
+            
+        except Exception as e:
+            logger.error(f"Error marking attendance: {str(e)}")
+            return {'success': False, 'message': 'System error occurred'}
+    
     def get_location_attendance_summary(self, location_id: int, target_date: date = None) -> dict:
         """Get attendance summary for a location on a specific date"""
         if target_date is None:

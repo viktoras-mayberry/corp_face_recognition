@@ -1,5 +1,5 @@
 from datetime import datetime
-from . import db
+from app import db
 
 class Location(db.Model):
     """CD locations where attendance can be marked"""

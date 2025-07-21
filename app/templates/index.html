@@ -1,0 +1,123 @@
+{% extends "base.html" %}
+
+{% block title %}Home - NYSC Corps Attendance System{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="jumbotron bg-success text-white rounded p-5 mb-5">
+        <div class="row">
+            <div class="col-md-8">
+                <h1 class="display-4">Welcome to NYSC Corps Attendance System</h1>
+                <p class="lead">Streamline your Community Development (CD) attendance tracking with our modern, secure system featuring facial recognition and PIN-based authentication.</p>
+                {% if not current_user.is_authenticated %}
+                    <div class="mt-4">
+                        <a class="btn btn-light btn-lg me-3" href="{{ url_for('auth.login') }}" role="button">
+                            <i class="fas fa-sign-in-alt me-2"></i>Login
+                        </a>
+                        <a class="btn btn-outline-light btn-lg" href="{{ url_for('auth.register') }}" role="button">
+                            <i class="fas fa-user-plus me-2"></i>Register
+                        </a>
+                    </div>
+                {% else %}
+                    <div class="mt-4">
+                        <a class="btn btn-light btn-lg me-3" href="{{ url_for('main.dashboard') }}" role="button">
+                            <i class="fas fa-tachometer-alt me-2"></i>Go to Dashboard
+                        </a>
+                    </div>
+                {% endif %}
+            </div>
+            <div class="col-md-4">
+                <div class="text-center">
+                    <i class="fas fa-users fa-5x opacity-75"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-4 mb-4">
+            <div class="card h-100">
+                <div class="card-body text-center">
+                    <i class="fas fa-camera fa-3x text-primary mb-3"></i>
+                    <h5 class="card-title">Face Recognition</h5>
+                    <p class="card-text">Secure and fast attendance marking using advanced facial recognition technology.</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-4 mb-4">
+            <div class="card h-100">
+                <div class="card-body text-center">
+                    <i class="fas fa-map-marker-alt fa-3x text-success mb-3"></i>
+                    <h5 class="card-title">Location Tracking</h5>
+                    <p class="card-text">GPS-enabled location verification to ensure attendance is marked at the correct CD venue.</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-4 mb-4">
+            <div class="card h-100">
+                <div class="card-body text-center">
+                    <i class="fas fa-chart-line fa-3x text-info mb-3"></i>
+                    <h5 class="card-title">Analytics & Reports</h5>
+                    <p class="card-text">Comprehensive reporting and analytics to track attendance patterns and performance.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mt-5">
+        <div class="col-md-12">
+            <h3 class="text-center mb-4">How It Works</h3>
+        </div>
+    </div>
+    
+    <div class="row">
+        <div class="col-md-3 text-center mb-4">
+            <div class="badge bg-primary rounded-circle p-3 mb-3">
+                <span class="h4 mb-0">1</span>
+            </div>
+            <h5>Register</h5>
+            <p class="text-muted">Create your account with your NYSC state code and personal information.</p>
+        </div>
+        
+        <div class="col-md-3 text-center mb-4">
+            <div class="badge bg-success rounded-circle p-3 mb-3">
+                <span class="h4 mb-0">2</span>
+            </div>
+            <h5>Setup Face ID</h5>
+            <p class="text-muted">Upload your photo for facial recognition setup (optional but recommended).</p>
+        </div>
+        
+        <div class="col-md-3 text-center mb-4">
+            <div class="badge bg-info rounded-circle p-3 mb-3">
+                <span class="h4 mb-0">3</span>
+            </div>
+            <h5>Mark Attendance</h5>
+            <p class="text-muted">Arrive at your CD location and mark attendance using face recognition or PIN.</p>
+        </div>
+        
+        <div class="col-md-3 text-center mb-4">
+            <div class="badge bg-warning rounded-circle p-3 mb-3">
+                <span class="h4 mb-0">4</span>
+            </div>
+            <h5>Track Progress</h5>
+            <p class="text-muted">Monitor your attendance history and receive notifications about upcoming CD activities.</p>
+        </div>
+    </div>
+
+    {% if not current_user.is_authenticated %}
+    <div class="row mt-5">
+        <div class="col-md-12 text-center">
+            <div class="bg-light p-4 rounded">
+                <h4>Ready to get started?</h4>
+                <p class="text-muted mb-4">Join thousands of corps members who are already using our system.</p>
+                <a class="btn btn-success btn-lg" href="{{ url_for('auth.register') }}">
+                    <i class="fas fa-rocket me-2"></i>Get Started Now
+                </a>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
