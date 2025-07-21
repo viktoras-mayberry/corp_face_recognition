@@ -26,7 +26,7 @@ def dashboard():
     active_users = User.query.filter_by(is_active=True).count()
     total_locations = Location.query.count()
     today_attendance = Attendance.query.filter(
-        Attendance.timestamp >= datetime.combine(date.today(), datetime.min.time())
+        Attendance.created_at >= datetime.combine(date.today(), datetime.min.time())
     ).count()
     
     return render_template('admin/dashboard.html',
@@ -86,7 +86,7 @@ def attendance():
     page = request.args.get('page', 1, type=int)
     per_page = 50
     
-    attendance_records = Attendance.query.order_by(Attendance.timestamp.desc()).paginate(
+    attendance_records = Attendance.query.order_by(Attendance.created_at.desc()).paginate(
         page=page, per_page=per_page, error_out=False
     )
     
@@ -98,3 +98,53 @@ def attendance():
 def reports():
     """Generate reports"""
     return render_template('admin/reports.html')
+
+@bp.route('/send_announcement', methods=['POST'])
+@login_required
+@admin_required
+def send_announcement():
+    """Send announcement to all corps members"""
+    try:
+        title = request.form.get('title', '').strip()
+        message = request.form.get('message', '').strip()
+        announcement_type = request.form.get('type', 'info')
+        
+        if not title or not message:
+            flash('Title and message are required.', 'error')
+            return redirect(url_for('admin.dashboard'))
+        
+        # Create announcement
+        from app.models import Announcement
+        announcement = Announcement(
+            title=title,
+            message=message,
+            announcement_type=announcement_type,
+            is_active=True,
+            is_urgent=(announcement_type in ['warning', 'danger']),
+            created_by=current_user.id
+        )
+        
+        db.session.add(announcement)
+        db.session.commit()
+        
+        flash(f'Announcement "{title}" has been sent successfully!', 'success')
+        return redirect(url_for('admin.dashboard'))
+        
+    except Exception as e:
+        flash(f'Error sending announcement: {str(e)}', 'error')
+        return redirect(url_for('admin.dashboard'))
+
+@bp.route('/announcements')
+@login_required
+@admin_required
+def announcements():
+    """Manage announcements"""
+    from app.models import Announcement
+    page = request.args.get('page', 1, type=int)
+    per_page = 20
+    
+    announcements = Announcement.query.order_by(Announcement.created_at.desc()).paginate(
+        page=page, per_page=per_page, error_out=False
+    )
+    
+    return render_template('admin/announcements.html', announcements=announcements)

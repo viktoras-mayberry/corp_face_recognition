@@ -57,6 +57,10 @@ def register():
         password = request.form.get('password')
         confirm_password = request.form.get('confirm_password')
         pin = request.form.get('pin', '').strip()
+        ppa_name = request.form.get('ppa_name', '').strip()
+        local_government = request.form.get('local_government', '').strip()
+        phone = request.form.get('phone', '').strip()
+        face_image = request.files.get('face_image')
         
         # Validation
         errors = []
@@ -96,6 +100,9 @@ def register():
             state_code=state_code,
             full_name=full_name,
             email=email,
+            phone=phone if phone else None,
+            ppa_name=ppa_name if ppa_name else None,
+            local_government=local_government if local_government else None,
             is_active=True  # Auto-activate for now, can be changed to require email verification
         )
         user.set_password(password)
@@ -103,6 +110,15 @@ def register():
         
         db.session.add(user)
         db.session.commit()
+        
+        # Process face image if provided
+        if face_image and face_image.filename:
+            from app.services.face_recognition_service import FaceRecognitionService
+            face_service = FaceRecognitionService()
+            result = face_service.save_user_face_image(user.id, face_image)
+            
+            if not result['success']:
+                flash(f"Warning: {result['message']}. You can upload your face image later from your profile.", 'warning')
         
         flash('Registration successful! Please log in.', 'success')
         return redirect(url_for('auth.login'))

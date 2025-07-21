@@ -1,0 +1,325 @@
+{% extends "base.html" %}
+
+{% block title %}Face Recognition Attendance - NYSC Corps Attendance System{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>
+            <i class="fas fa-camera me-2"></i>
+            Face Recognition Attendance
+        </h2>
+        <div>
+            <span class="badge bg-primary">{{ current_user.state_code }}</span>
+        </div>
+    </div>
+
+    {% if not current_user.has_face_data() %}
+    <div class="alert alert-warning">
+        <h5><i class="fas fa-exclamation-triangle me-2"></i>Face Recognition Not Set Up</h5>
+        <p class="mb-2">You haven't uploaded your face image yet. Please upload your face image from your profile to use face recognition for attendance.</p>
+        <a href="{{ url_for('main.profile') }}" class="btn btn-warning">
+            <i class="fas fa-user-circle me-2"></i>Go to Profile
+        </a>
+    </div>
+    {% endif %}
+
+    {% if schedules %}
+        <div class="row">
+            {% for schedule in schedules %}
+            <div class="col-md-6 col-lg-4 mb-4">
+                <div class="card h-100 border-success">
+                    <div class="card-header bg-success text-white">
+                        <h6 class="mb-0">
+                            <i class="fas fa-calendar-day me-2"></i>
+                            Today's Activity
+                        </h6>
+                    </div>
+                    <div class="card-body">
+                        <h5 class="card-title">
+                            <i class="fas fa-building me-2 text-primary"></i>
+                            {{ schedule.location.name }}
+                        </h5>
+                        
+                        <div class="mb-2">
+                            <small class="text-muted">
+                                <i class="fas fa-map-marker-alt me-1"></i>
+                                {{ schedule.location.address }}
+                            </small>
+                        </div>
+                        
+                        <div class="mb-2">
+                            <small class="text-muted">
+                                <i class="fas fa-clock me-1"></i>
+                                {{ schedule.start_time.strftime('%H:%M') }} - {{ schedule.end_time.strftime('%H:%M') }}
+                            </small>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <small class="text-muted">
+                                <i class="fas fa-tasks me-1"></i>
+                                {{ schedule.activity_type }}
+                            </small>
+                        </div>
+
+                        {% if schedule.description %}
+                        <p class="card-text">
+                            <small>{{ schedule.description }}</small>
+                        </p>
+                        {% endif %}
+                        
+                        <div class="d-grid">
+                            <button class="btn btn-success" onclick="markAttendanceWithFace({{ schedule.id }}, '{{ schedule.location.name }}')" 
+                                    {% if not current_user.has_face_data() %}disabled{% endif %}>
+                                <i class="fas fa-camera me-2"></i>
+                                Mark Attendance with Face + PIN
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <div class="text-center py-5">
+            <i class="fas fa-calendar-times fa-5x text-muted mb-3"></i>
+            <h4 class="text-muted">No CD Activities Today</h4>
+            <p class="text-muted">No Community Development activities are scheduled for today.</p>
+            <a href="{{ url_for('main.dashboard') }}" class="btn btn-primary">
+                <i class="fas fa-tachometer-alt me-2"></i>Back to Dashboard
+            </a>
+        </div>
+    {% endif %}
+</div>
+
+<!-- Face Recognition Modal -->
+<div class="modal fade" id="faceRecognitionModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-camera me-2"></i>
+                    Face Recognition Attendance
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="text-center">
+                    <h6 class="mb-3">Location: <span id="selectedLocation"></span></h6>
+                    
+                    <!-- Step 1: PIN Entry -->
+                    <div id="pinStep" class="step-container">
+                        <div class="mb-4">
+                            <i class="fas fa-key fa-3x text-primary mb-3"></i>
+                            <h5>Step 1: Enter Your PIN</h5>
+                            <p class="text-muted">Please enter your 4-digit PIN to proceed</p>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <input type="password" class="form-control form-control-lg text-center" 
+                                   id="attendancePin" placeholder="Enter 4-digit PIN" maxlength="4" 
+                                   style="font-size: 2rem; letter-spacing: 0.5rem;">
+                        </div>
+                        
+                        <button class="btn btn-primary btn-lg" onclick="proceedToFaceRecognition()">
+                            <i class="fas fa-arrow-right me-2"></i>Proceed to Face Recognition
+                        </button>
+                    </div>
+                    
+                    <!-- Step 2: Face Recognition -->
+                    <div id="faceStep" class="step-container" style="display: none;">
+                        <div class="mb-4">
+                            <i class="fas fa-camera fa-3x text-success mb-3"></i>
+                            <h5>Step 2: Face Recognition</h5>
+                            <p class="text-muted">Look directly at the camera for face recognition</p>
+                        </div>
+                        
+                        <div class="camera-container mb-4" style="display: none;">
+                            <video id="camera" width="400" height="300" autoplay class="border rounded"></video>
+                            <canvas id="canvas" width="400" height="300" style="display: none;"></canvas>
+                        </div>
+                        
+                        <div class="alert alert-info mb-4">
+                            <h6><i class="fas fa-info-circle me-2"></i>Face Recognition Tips:</h6>
+                            <ul class="mb-0 text-start">
+                                <li>Look directly at the camera</li>
+                                <li>Ensure good lighting</li>
+                                <li>Remove sunglasses or face coverings</li>
+                                <li>Stay still for a few seconds</li>
+                            </ul>
+                        </div>
+                        
+                        <div class="d-grid gap-2">
+                            <button class="btn btn-success btn-lg" onclick="startCamera()" id="startCameraBtn">
+                                <i class="fas fa-play me-2"></i>Start Camera
+                            </button>
+                            <button class="btn btn-primary btn-lg" onclick="captureAndRecognize()" 
+                                    id="captureBtn" style="display: none;">
+                                <i class="fas fa-camera me-2"></i>Capture & Recognize Face
+                            </button>
+                            <button class="btn btn-secondary" onclick="goBackToPin()">
+                                <i class="fas fa-arrow-left me-2"></i>Back to PIN Entry
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- Loading State -->
+                    <div id="loadingStep" class="step-container" style="display: none;">
+                        <div class="mb-4">
+                            <div class="spinner-border text-primary" style="width: 3rem; height: 3rem;"></div>
+                            <h5 class="mt-3">Processing Attendance...</h5>
+                            <p class="text-muted">Please wait while we verify your identity</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let currentScheduleId = null;
+let videoStream = null;
+
+function markAttendanceWithFace(scheduleId, locationName) {
+    currentScheduleId = scheduleId;
+    document.getElementById('selectedLocation').textContent = locationName;
+    
+    // Reset modal state
+    showStep('pinStep');
+    document.getElementById('attendancePin').value = '';
+    
+    // Show modal
+    const modal = new bootstrap.Modal(document.getElementById('faceRecognitionModal'));
+    modal.show();
+}
+
+function showStep(stepId) {
+    // Hide all steps
+    document.querySelectorAll('.step-container').forEach(step => {
+        step.style.display = 'none';
+    });
+    
+    // Show selected step
+    document.getElementById(stepId).style.display = 'block';
+}
+
+function proceedToFaceRecognition() {
+    const pin = document.getElementById('attendancePin').value;
+    
+    if (!pin || pin.length !== 4) {
+        alert('Please enter a valid 4-digit PIN');
+        return;
+    }
+    
+    showStep('faceStep');
+}
+
+function goBackToPin() {
+    // Stop camera if running
+    if (videoStream) {
+        videoStream.getTracks().forEach(track => track.stop());
+        videoStream = null;
+    }
+    
+    showStep('pinStep');
+}
+
+async function startCamera() {
+    try {
+        const constraints = {
+            video: { width: 400, height: 300 }
+        };
+        
+        videoStream = await navigator.mediaDevices.getUserMedia(constraints);
+        const video = document.getElementById('camera');
+        video.srcObject = videoStream;
+        
+        document.querySelector('.camera-container').style.display = 'block';
+        document.getElementById('startCameraBtn').style.display = 'none';
+        document.getElementById('captureBtn').style.display = 'inline-block';
+        
+    } catch (error) {
+        console.error('Error accessing camera:', error);
+        alert('Unable to access camera. Please ensure camera permissions are granted.');
+    }
+}
+
+function captureAndRecognize() {
+    const pin = document.getElementById('attendancePin').value;
+    
+    if (!pin || pin.length !== 4) {
+        alert('Invalid PIN. Please go back and enter a valid 4-digit PIN');
+        return;
+    }
+    
+    // Show loading state
+    showStep('loadingStep');
+    
+    // Simulate face recognition (in production, this would capture image and send to server)
+    fetch('/mark_face_attendance', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            'schedule_id': currentScheduleId,
+            'pin': pin
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        // Stop camera
+        if (videoStream) {
+            videoStream.getTracks().forEach(track => track.stop());
+            videoStream = null;
+        }
+        
+        // Hide modal
+        bootstrap.Modal.getInstance(document.getElementById('faceRecognitionModal')).hide();
+        
+        if (data.success) {
+            alert(`✅ Attendance Marked Successfully!\n\nWelcome, ${data.user_name}!\nTime: ${data.check_in_time || 'Now'}`);
+            location.reload();
+        } else {
+            alert('❌ Error: ' + data.error);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('An error occurred while marking attendance.');
+        
+        // Hide modal and stop camera
+        bootstrap.Modal.getInstance(document.getElementById('faceRecognitionModal')).hide();
+        if (videoStream) {
+            videoStream.getTracks().forEach(track => track.stop());
+            videoStream = null;
+        }
+    });
+}
+
+// PIN input formatting
+document.getElementById('attendancePin').addEventListener('input', function(e) {
+    // Only allow numeric input
+    e.target.value = e.target.value.replace(/[^0-9]/g, '');
+});
+
+// Allow Enter key to proceed from PIN step
+document.getElementById('attendancePin').addEventListener('keypress', function(e) {
+    if (e.key === 'Enter') {
+        proceedToFaceRecognition();
+    }
+});
+
+// Clean up camera when modal is closed
+document.getElementById('faceRecognitionModal').addEventListener('hidden.bs.modal', function() {
+    if (videoStream) {
+        videoStream.getTracks().forEach(track => track.stop());
+        videoStream = null;
+    }
+});
+</script>
+{% endblock %}

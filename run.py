@@ -1,6 +1,6 @@
 import os
 from app import create_app, db
-from app.models import User, Attendance, Location, CDSchedule
+from app.models import User, Attendance, Location, CDSchedule, Announcement
 from flask_migrate import upgrade
 from dotenv import load_dotenv
 
@@ -16,7 +16,8 @@ def make_shell_context():
         'User': User, 
         'Attendance': Attendance, 
         'Location': Location,
-        'CDSchedule': CDSchedule
+        'CDSchedule': CDSchedule,
+        'Announcement': Announcement
     }
 
 @app.cli.command()

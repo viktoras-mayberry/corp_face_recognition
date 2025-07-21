@@ -31,7 +31,7 @@ def mark_attendance():
         # Check if already marked for today
         existing_attendance = Attendance.query.filter_by(
             user_id=current_user.id,
-            schedule_id=schedule_id,
+            location_id=schedule.location_id,
             attendance_date=date.today()
         ).first()
         
@@ -72,18 +72,18 @@ def attendance_history():
         
         attendance_records = Attendance.query.filter_by(
             user_id=current_user.id
-        ).order_by(Attendance.timestamp.desc()).paginate(
+        ).order_by(Attendance.created_at.desc()).paginate(
             page=page, per_page=per_page, error_out=False
         )
         
         return jsonify({
             'attendance_records': [{
                 'id': record.id,
-                'schedule_id': record.schedule_id,
-                'location_name': record.schedule.location.name if record.schedule and record.schedule.location else 'N/A',
+                'location_id': record.location_id,
+                'location_name': record.location.name if record.location else 'N/A',
                 'attendance_date': record.attendance_date.isoformat(),
-                'timestamp': record.timestamp.isoformat(),
-                'method': record.method,
+                'created_at': record.created_at.isoformat(),
+                'recognition_method': record.recognition_method,
                 'status': record.status
             } for record in attendance_records.items],
             'total': attendance_records.total,

@@ -1,0 +1,177 @@
+{% extends "base.html" %}
+
+{% block title %}Register - NYSC Corps Attendance System{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-md-8 col-lg-6">
+            <div class="card shadow">
+                <div class="card-header text-center bg-success text-white">
+                    <h4><i class="fas fa-user-plus me-2"></i>Register</h4>
+                    <p class="mb-0">Create your NYSC Corps attendance account</p>
+                </div>
+                <div class="card-body p-4">
+                    <form method="POST" enctype="multipart/form-data">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="state_code" class="form-label">State Code *</label>
+                                    <div class="input-group">
+                                        <span class="input-group-text"><i class="fas fa-id-card"></i></span>
+                                        <input type="text" class="form-control" id="state_code" name="state_code" 
+                                               placeholder="e.g., NY/23A/1234" required 
+                                               value="{{ request.form.state_code if request.form.state_code }}">
+                                    </div>
+                                    <div class="form-text">Your NYSC state code (including batch and number)</div>
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="full_name" class="form-label">Full Name *</label>
+                                    <div class="input-group">
+                                        <span class="input-group-text"><i class="fas fa-user"></i></span>
+                                        <input type="text" class="form-control" id="full_name" name="full_name" 
+                                               placeholder="John Doe" required
+                                               value="{{ request.form.full_name if request.form.full_name }}">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="email" class="form-label">Email Address *</label>
+                            <div class="input-group">
+                                <span class="input-group-text"><i class="fas fa-envelope"></i></span>
+                                <input type="email" class="form-control" id="email" name="email" 
+                                       placeholder="john.doe@email.com" required
+                                       value="{{ request.form.email if request.form.email }}">
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="phone" class="form-label">Phone Number (Optional)</label>
+                            <div class="input-group">
+                                <span class="input-group-text"><i class="fas fa-phone"></i></span>
+                                <input type="tel" class="form-control" id="phone" name="phone" 
+                                       placeholder="+2348012345678"
+                                       value="{{ request.form.phone if request.form.phone }}">
+                            </div>
+                            <div class="form-text">Required for SMS notifications</div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="password" class="form-label">Password *</label>
+                                    <div class="input-group">
+                                        <span class="input-group-text"><i class="fas fa-lock"></i></span>
+                                        <input type="password" class="form-control" id="password" name="password" 
+                                               placeholder="Enter password" required>
+                                    </div>
+                                    <div class="form-text">Minimum 6 characters</div>
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="confirm_password" class="form-label">Confirm Password *</label>
+                                    <div class="input-group">
+                                        <span class="input-group-text"><i class="fas fa-lock"></i></span>
+                                        <input type="password" class="form-control" id="confirm_password" name="confirm_password" 
+                                               placeholder="Confirm password" required>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="pin" class="form-label">4-Digit PIN *</label>
+                            <div class="input-group">
+                                <span class="input-group-text"><i class="fas fa-key"></i></span>
+                                <input type="password" class="form-control" id="pin" name="pin" 
+                                       placeholder="1234" maxlength="4" pattern="[0-9]{4}" required>
+                            </div>
+                            <div class="form-text">This PIN will be used along with face recognition for attendance</div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="face_image" class="form-label">Face Image *</label>
+                            <input type="file" class="form-control" id="face_image" name="face_image" 
+                                   accept="image/*" required>
+                            <div class="form-text">Upload a clear face image for attendance recognition. Ensure good lighting and face is visible.</div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="ppa_name" class="form-label">PPA Name (Optional)</label>
+                                    <div class="input-group">
+                                        <span class="input-group-text"><i class="fas fa-building"></i></span>
+                                        <input type="text" class="form-control" id="ppa_name" name="ppa_name" 
+                                               placeholder="Primary Place of Assignment"
+                                               value="{{ request.form.ppa_name if request.form.ppa_name }}">
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="local_government" class="form-label">Local Government (Optional)</label>
+                                    <div class="input-group">
+                                        <span class="input-group-text"><i class="fas fa-location-arrow"></i></span>
+                                        <input type="text" class="form-control" id="local_government" name="local_government" 
+                                               placeholder="Your LGA"
+                                               value="{{ request.form.local_government if request.form.local_government }}">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="d-grid mb-3">
+                            <button type="submit" class="btn btn-success">
+                                <i class="fas fa-user-plus me-2"></i>Create Account
+                            </button>
+                        </div>
+                    </form>
+                    
+                    <hr>
+                    
+                    <div class="text-center">
+                        <p class="mb-2">Already have an account?</p>
+                        <a href="{{ url_for('auth.login') }}" class="btn btn-outline-success">
+                            <i class="fas fa-sign-in-alt me-2"></i>Login Here
+                        </a>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="mt-4">
+                <div class="alert alert-info">
+                    <h6><i class="fas fa-info-circle me-2"></i>Registration Requirements:</h6>
+                    <ul class="mb-0">
+                        <li>Valid NYSC state code</li>
+                        <li>Working email address</li>
+                        <li>Strong password (minimum 6 characters)</li>
+                        <li>4-digit PIN for attendance verification</li>
+                        <li>Phone number for SMS notifications (optional but recommended)</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.getElementById('pin').addEventListener('input', function(e) {
+    // Only allow numeric input for PIN
+    e.target.value = e.target.value.replace(/[^0-9]/g, '');
+});
+
+document.getElementById('state_code').addEventListener('input', function(e) {
+    // Convert to uppercase for state code
+    e.target.value = e.target.value.toUpperCase();
+});
+</script>
+{% endblock %}

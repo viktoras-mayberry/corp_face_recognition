@@ -1,5 +1,5 @@
 from app import create_app, db
-from app.models import User, Location, CDSchedule
+from app.models import User, Location, CDSchedule, Announcement
 import os
 from datetime import date, datetime
 
@@ -77,10 +77,42 @@ def create_database():
             )
             db.session.add(schedule)
         
+        # Create sample announcements
+        announcements = [
+            {
+                'title': 'Welcome to NYSC CD Attendance System',
+                'message': 'Welcome to the new digital attendance system! Please ensure you upload your face image in your profile to enable face recognition for easy attendance marking.',
+                'announcement_type': 'info',
+                'is_active': True,
+                'is_urgent': False,
+                'created_by': admin.id
+            },
+            {
+                'title': 'CD Activity - Environmental Sanitation',
+                'message': 'This Thursday, we will be participating in environmental sanitation activities. Please come prepared with appropriate clothing and tools. Meeting time: 7:00 AM.',
+                'announcement_type': 'warning',
+                'is_active': True,
+                'is_urgent': True,
+                'created_by': admin.id
+            },
+            {
+                'title': 'Congratulations to Outstanding Corps Members',
+                'message': 'We celebrate the corps members who have maintained 100% attendance this month. Keep up the excellent work!',
+                'announcement_type': 'success',
+                'is_active': True,
+                'is_urgent': False,
+                'created_by': admin.id
+            }
+        ]
+        
+        for announcement_data in announcements:
+            announcement = Announcement(**announcement_data)
+            db.session.add(announcement)
+        
         db.session.commit()
         print("Database created successfully!")
         print("Admin credentials - Email: admin@corps.gov.ng, Password: admin123, PIN: 0000")
-        print("Sample locations and today's schedule created.")
+        print("Sample locations, schedules, and announcements created.")
 
 if __name__ == '__main__':
     create_database()

@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+
+{% block title %}Profile - NYSC Corps Attendance System{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>
+            <i class="fas fa-user-circle me-2"></i>
+            Profile
+        </h2>
+    </div>
+
+    <div class="card">
+        <div class="card-header bg-success text-white">
+            <h5 class="mb-0">Account Details</h5>
+        </div>
+        <div class="card-body">
+            <div class="row mb-3">
+                <div class="col-md-6">
+                    <strong>State Code:</strong>
+                    <span>{{ user.state_code }}</span>
+                </div>
+                <div class="col-md-6">
+                    <strong>Full Name:</strong>
+                    <span>{{ user.full_name }}</span>
+                </div>
+            </div>
+
+            <div class="row mb-3">
+                <div class="col-md-6">
+                    <strong>Email:</strong>
+                    <span>{{ user.email }}</span>
+                </div>
+                <div class="col-md-6">
+                    <strong>Phone:</strong>
+                    <span>{{ user.phone if user.phone else 'Not Provided' }}</span>
+                </div>
+            </div>
+
+            <div class="row mb-3">
+                <div class="col-md-6">
+                    <strong>PPA Name:</strong>
+                    <span>{{ user.ppa_name if user.ppa_name else 'Not Provided' }}</span>
+                </div>
+                <div class="col-md-6">
+                    <strong>Local Government:</strong>
+                    <span>{{ user.local_government if user.local_government else 'Not Provided' }}</span>
+                </div>
+            </div>
+
+            <div class="row mb-3">
+                <div class="col-md-6">
+                    <strong>Batch:</strong>
+                    <span>{{ user.batch if user.batch else 'Not Provided' }}</span>
+                </div>
+                <div class="col-md-6">
+                    <strong>Account Status:</strong>
+                    <span class="badge {{ 'bg-success' if user.is_active else 'bg-danger' }}">
+                        {{ 'Active' if user.is_active else 'Inactive' }}
+                    </span>
+                </div>
+            </div>
+
+            <div class="row mb-3">
+                <div class="col-md-6">
+                    <strong>Face Data:</strong>
+                    <span class="badge {{ 'bg-success' if user.has_face_data() else 'bg-secondary' }}">
+                        {{ 'Registered' if user.has_face_data() else 'Not Registered' }}
+                    </span>
+                </div>
+                <div class="col-md-6">
+                    <strong>Admin Access:</strong>
+                    <span class="badge {{ 'bg-primary' if user.is_admin else 'bg-secondary' }}">
+                        {{ 'Yes' if user.is_admin else 'No' }}
+                    </span>
+                </div>
+            </div>
+
+            <a href="{{ url_for('auth.verify_pin') }}" class="btn btn-sm btn-primary">
+                <i class="fas fa-lock me-1"></i> Security Settings
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}

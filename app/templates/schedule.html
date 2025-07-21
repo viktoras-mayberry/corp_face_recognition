@@ -1,0 +1,146 @@
+{% extends "base.html" %}
+
+{% block title %}Schedule - NYSC Corps Attendance System{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>
+            <i class="fas fa-calendar-alt me-2"></i>
+            CD Schedule
+        </h2>
+    </div>
+
+    <div class="row">
+        {% if schedules %}
+            {% for schedule in schedules %}
+            <div class="col-md-6 col-lg-4 mb-4">
+                <div class="card h-100 {% if schedule.is_current() %}border-success{% endif %}">
+                    <div class="card-header {% if schedule.is_current() %}bg-success text-white{% else %}bg-light{% endif %}">
+                        <h6 class="mb-0">
+                            <i class="fas fa-calendar-day me-2"></i>
+                            {{ schedule.schedule_date.strftime('%B %d, %Y') }}
+                            {% if schedule.is_current() %}
+                                <span class="badge bg-light text-success ms-2">Today</span>
+                            {% endif %}
+                        </h6>
+                    </div>
+                    <div class="card-body">
+                        <h5 class="card-title">
+                            <i class="fas fa-building me-2 text-primary"></i>
+                            {{ schedule.location.name }}
+                        </h5>
+                        
+                        <div class="mb-2">
+                            <small class="text-muted">
+                                <i class="fas fa-map-marker-alt me-1"></i>
+                                {{ schedule.location.address }}
+                            </small>
+                        </div>
+                        
+                        <div class="mb-2">
+                            <small class="text-muted">
+                                <i class="fas fa-clock me-1"></i>
+                                {{ schedule.start_time.strftime('%H:%M') }} - {{ schedule.end_time.strftime('%H:%M') }}
+                            </small>
+                        </div>
+                        
+                        <div class="mb-2">
+                            <small class="text-muted">
+                                <i class="fas fa-tasks me-1"></i>
+                                {{ schedule.activity_type }}
+                            </small>
+                        </div>
+                        
+                        {% if schedule.expected_attendees %}
+                        <div class="mb-2">
+                            <small class="text-muted">
+                                <i class="fas fa-users me-1"></i>
+                                Expected: {{ schedule.expected_attendees }} attendees
+                            </small>
+                        </div>
+                        {% endif %}
+                        
+                        {% if schedule.description %}
+                        <p class="card-text">
+                            <small>{{ schedule.description }}</small>
+                        </p>
+                        {% endif %}
+                    </div>
+                    <div class="card-footer">
+                        <div class="d-flex justify-content-between align-items-center">
+                            {% if schedule.is_cancelled %}
+                                <span class="badge bg-danger">
+                                    <i class="fas fa-times-circle me-1"></i>Cancelled
+                                </span>
+                            {% elif schedule.is_active_now() %}
+                                <span class="badge bg-success">
+                                    <i class="fas fa-play-circle me-1"></i>Active Now
+                                </span>
+                            {% elif schedule.can_mark_attendance() %}
+                                <span class="badge bg-primary">
+                                    <i class="fas fa-check-circle me-1"></i>Available
+                                </span>
+                            {% else %}
+                                <span class="badge bg-secondary">
+                                    <i class="fas fa-clock me-1"></i>Scheduled
+                                </span>
+                            {% endif %}
+                            
+                            {% if schedule.can_mark_attendance() and schedule.is_current() %}
+                                <button class="btn btn-success btn-sm" onclick="markAttendance({{ schedule.id }})">
+                                    <i class="fas fa-check me-1"></i>Mark Attendance
+                                </button>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        {% else %}
+            <div class="col-12">
+                <div class="text-center py-5">
+                    <i class="fas fa-calendar-times fa-5x text-muted mb-3"></i>
+                    <h4 class="text-muted">No Schedules Available</h4>
+                    <p class="text-muted">No CD activities are scheduled at the moment.</p>
+                    {% if current_user.is_admin %}
+                        <a href="{{ url_for('admin.schedules') }}" class="btn btn-success">
+                            <i class="fas fa-plus me-2"></i>Add Schedule
+                        </a>
+                    {% endif %}
+                </div>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<script>
+function markAttendance(scheduleId) {
+    if (confirm('Mark attendance for this CD activity?')) {
+        fetch('/api/attendance/mark', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                'schedule_id': scheduleId,
+                'method': 'manual'
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert('Attendance marked successfully!');
+                location.reload();
+            } else {
+                alert('Error: ' + data.error);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('An error occurred while marking attendance.');
+        });
+    }
+}
+</script>
+{% endblock %}

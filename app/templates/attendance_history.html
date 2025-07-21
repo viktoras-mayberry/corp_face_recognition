@@ -1,0 +1,206 @@
+{% extends "base.html" %}
+
+{% block title %}My Attendance History - NYSC Corps Attendance System{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>
+            <i class="fas fa-history me-2"></i>
+            My Attendance History
+        </h2>
+        <div>
+            <span class="badge bg-info">{{ attendance_records.total }} Total Records</span>
+        </div>
+    </div>
+
+    {% if attendance_records.items %}
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-calendar-check me-2"></i>
+                    Attendance Records
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead class="table-success">
+                            <tr>
+                                <th>Date</th>
+                                <th>Location</th>
+                                <th>Check-in Time</th>
+                                <th>Status</th>
+                                <th>Method</th>
+                                <th>Notes</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for record in attendance_records.items %}
+                            <tr>
+                                <td>
+                                    <strong>{{ record.attendance_date.strftime('%B %d, %Y') }}</strong><br>
+                                    <small class="text-muted">{{ record.attendance_date.strftime('%A') }}</small>
+                                </td>
+                                <td>
+                                    <strong>{{ record.location.name if record.location else 'Unknown' }}</strong><br>
+                                    {% if record.location %}
+                                        <small class="text-muted">{{ record.location.local_government }}, {{ record.location.state }}</small>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <strong>{{ record.check_in_time.strftime('%I:%M %p') }}</strong><br>
+                                    {% if record.check_out_time %}
+                                        <small class="text-muted">Out: {{ record.check_out_time.strftime('%I:%M %p') }}</small>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if record.status == 'present' %}
+                                        <span class="badge bg-success">
+                                            <i class="fas fa-check-circle me-1"></i>Present
+                                        </span>
+                                    {% elif record.status == 'late' %}
+                                        <span class="badge bg-warning">
+                                            <i class="fas fa-clock me-1"></i>Late
+                                        </span>
+                                    {% elif record.status == 'very_late' %}
+                                        <span class="badge bg-danger">
+                                            <i class="fas fa-exclamation-triangle me-1"></i>Very Late
+                                        </span>
+                                    {% else %}
+                                        <span class="badge bg-secondary">{{ record.status.title() }}</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if record.recognition_method == 'face' %}
+                                        <span class="badge bg-info">
+                                            <i class="fas fa-camera me-1"></i>Face Recognition
+                                        </span>
+                                    {% elif record.recognition_method == 'face_pin' %}
+                                        <span class="badge bg-primary">
+                                            <i class="fas fa-shield-alt me-1"></i>Face + PIN
+                                        </span>
+                                    {% elif record.recognition_method == 'pin' %}
+                                        <span class="badge bg-secondary">
+                                            <i class="fas fa-key me-1"></i>PIN Only
+                                        </span>
+                                    {% else %}
+                                        <span class="badge bg-light text-dark">
+                                            <i class="fas fa-hand-paper me-1"></i>Manual
+                                        </span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if record.notes %}
+                                        <small class="text-muted">{{ record.notes }}</small>
+                                    {% else %}
+                                        <small class="text-muted">-</small>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Pagination -->
+                {% if attendance_records.pages > 1 %}
+                <nav aria-label="Attendance pagination">
+                    <ul class="pagination justify-content-center mt-4">
+                        {% if attendance_records.has_prev %}
+                            <li class="page-item">
+                                <a class="page-link" href="{{ url_for('main.attendance_history', page=attendance_records.prev_num) }}">
+                                    <i class="fas fa-chevron-left"></i> Previous
+                                </a>
+                            </li>
+                        {% endif %}
+
+                        {% for page_num in attendance_records.iter_pages() %}
+                            {% if page_num %}
+                                {% if page_num != attendance_records.page %}
+                                    <li class="page-item">
+                                        <a class="page-link" href="{{ url_for('main.attendance_history', page=page_num) }}">{{ page_num }}</a>
+                                    </li>
+                                {% else %}
+                                    <li class="page-item active">
+                                        <span class="page-link">{{ page_num }}</span>
+                                    </li>
+                                {% endif %}
+                            {% else %}
+                                <li class="page-item disabled">
+                                    <span class="page-link">...</span>
+                                </li>
+                            {% endif %}
+                        {% endfor %}
+
+                        {% if attendance_records.has_next %}
+                            <li class="page-item">
+                                <a class="page-link" href="{{ url_for('main.attendance_history', page=attendance_records.next_num) }}">
+                                    Next <i class="fas fa-chevron-right"></i>
+                                </a>
+                            </li>
+                        {% endif %}
+                    </ul>
+                </nav>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Summary Statistics -->
+        <div class="row mt-4">
+            <div class="col-md-6">
+                <div class="card bg-light">
+                    <div class="card-body text-center">
+                        <h5 class="card-title">Current Month Summary</h5>
+                        {% set stats = current_user.get_attendance_summary() %}
+                        <div class="row">
+                            <div class="col-4">
+                                <h4 class="text-success">{{ stats.present_days }}</h4>
+                                <small>Present</small>
+                            </div>
+                            <div class="col-4">
+                                <h4 class="text-warning">{{ stats.late }}</h4>
+                                <small>Late</small>
+                            </div>
+                            <div class="col-4">
+                                <h4 class="text-danger">{{ stats.absent_days }}</h4>
+                                <small>Absent</small>
+                            </div>
+                        </div>
+                        <hr>
+                        <h5 class="text-primary">{{ "%.1f"|format(stats.attendance_rate) }}%</h5>
+                        <small class="text-muted">Attendance Rate</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card bg-light">
+                    <div class="card-body">
+                        <h5 class="card-title">
+                            <i class="fas fa-info-circle me-2"></i>
+                            Quick Actions
+                        </h5>
+                        <div class="d-grid gap-2">
+                            <a href="{{ url_for('main.dashboard') }}" class="btn btn-primary">
+                                <i class="fas fa-tachometer-alt me-2"></i>Back to Dashboard
+                            </a>
+                            <a href="{{ url_for('main.face_attendance') }}" class="btn btn-success">
+                                <i class="fas fa-camera me-2"></i>Mark Today's Attendance
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    {% else %}
+        <div class="text-center py-5">
+            <i class="fas fa-calendar-times fa-5x text-muted mb-3"></i>
+            <h4 class="text-muted">No Attendance Records Found</h4>
+            <p class="text-muted mb-4">You haven't marked attendance yet. Start by marking your attendance for today's activities.</p>
+            <a href="{{ url_for('main.face_attendance') }}" class="btn btn-success btn-lg">
+                <i class="fas fa-camera me-2"></i>Mark Attendance Now
+            </a>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}
