@@ -47,6 +47,58 @@ def profile():
     """User profile page"""
     return render_template('profile.html', user=current_user)
 
+@bp.route('/profile/edit', methods=['GET', 'POST'])
+@login_required
+def edit_profile():
+    """Edit user profile details and optionally upload a new face image."""
+    if request.method == 'POST':
+        full_name = request.form.get('full_name', '').strip()
+        phone = request.form.get('phone', '').strip()
+        ppa_name = request.form.get('ppa_name', '').strip()
+        local_government = request.form.get('local_government', '').strip()
+        batch = request.form.get('batch', '').strip()
+        face_image = request.files.get('face_image')
+
+        # Update user fields
+        current_user.full_name = full_name or current_user.full_name
+        current_user.phone = phone or current_user.phone
+        current_user.ppa_name = ppa_name or current_user.ppa_name
+        current_user.local_government = local_government or current_user.local_government
+        current_user.batch = batch or current_user.batch
+        db.session.commit()
+
+        # Process face image if provided
+        if face_image and face_image.filename:
+            from app.services.face_recognition_service import FaceRecognitionService
+            face_service = FaceRecognitionService()
+            result = face_service.save_user_face_image(current_user.id, face_image)
+            if not result['success']:
+                flash(f"Warning: {result['message']}", 'warning')
+            else:
+                flash('Face image updated successfully.', 'success')
+        else:
+            flash('Profile updated successfully.', 'success')
+        return redirect(url_for('main.profile'))
+
+    return render_template('edit_profile.html', user=current_user)
+
+@bp.route('/profile/upload_face', methods=['POST'])
+@login_required
+def upload_face_image():
+    """Upload or update face image only (AJAX or form)."""
+    face_image = request.files.get('face_image')
+    if not face_image or not face_image.filename:
+        flash('No image file selected.', 'danger')
+        return redirect(url_for('main.profile'))
+    from app.services.face_recognition_service import FaceRecognitionService
+    face_service = FaceRecognitionService()
+    result = face_service.save_user_face_image(current_user.id, face_image)
+    if not result['success']:
+        flash(f"Warning: {result['message']}", 'warning')
+    else:
+        flash('Face image uploaded successfully.', 'success')
+    return redirect(url_for('main.profile'))
+
 @bp.route('/attendance')
 @login_required
 def attendance_history():

@@ -1,0 +1,318 @@
+{% extends "admin/base.html" %}
+
+{% block title %}CD Schedules - Admin{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2 class="fw-bold text-primary">
+        <i class="fas fa-calendar-alt me-2"></i>
+        Community Development Schedules
+    </h2>
+                    <a href="{{ url_for('admin.new_schedule') }}" class="btn btn-primary">
+                        <i class="bi bi-plus-circle"></i> Add Schedule
+                    </a>
+</div>
+
+<!-- Search and Filter Bar -->
+<div class="row mb-4">
+    <div class="col-md-6">
+        <div class="input-group">
+            <span class="input-group-text"><i class="fas fa-search"></i></span>
+            <input type="text" class="form-control" id="searchSchedule" placeholder="Search schedules...">
+        </div>
+    </div>
+    <div class="col-md-3">
+        <select class="form-select" id="filterLocation">
+            <option value="">All Locations</option>
+            {% for location in locations %}
+            <option value="{{ location.name }}">{{ location.name }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <div class="col-md-3">
+        <select class="form-select" id="filterStatus">
+            <option value="">All Status</option>
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+        </select>
+    </div>
+</div>
+
+<!-- Schedules Table -->
+<div class="card shadow-sm">
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0" id="schedulesTable">
+                <thead class="table-light">
+                    <tr>
+                        <th><i class="fas fa-calendar me-1"></i>Date</th>
+                        <th><i class="fas fa-map-marker-alt me-1"></i>Location</th>
+                        <th><i class="fas fa-tasks me-1"></i>Type</th>
+                        <th><i class="fas fa-clock me-1"></i>Start Time</th>
+                        <th><i class="fas fa-clock me-1"></i>End Time</th>
+                        <th><i class="fas fa-toggle-on me-1"></i>Status</th>
+                        <th class="text-center"><i class="fas fa-cogs me-1"></i>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% if schedules %}
+                        {% for schedule in schedules %}
+                        <tr>
+                            <td class="fw-medium">{{ schedule.date.strftime('%Y-%m-%d') if schedule.date else 'N/A' }}</td>
+                            <td>
+                                <i class="fas fa-map-marker-alt text-muted me-1"></i>
+                                {{ schedule.location.name if schedule.location else 'No Location' }}
+                            </td>
+                            <td>
+                                <span class="badge bg-info text-dark">
+                                    {{ schedule.type or 'General' }}
+                                </span>
+                            </td>
+                            <td>{{ schedule.start_time.strftime('%H:%M') if schedule.start_time else 'N/A' }}</td>
+                            <td>{{ schedule.end_time.strftime('%H:%M') if schedule.end_time else 'N/A' }}</td>
+                            <td>
+                                {% if schedule.active %}
+                                    <span class="badge bg-success"><i class="fas fa-check-circle me-1"></i>Active</span>
+                                {% else %}
+                                    <span class="badge bg-secondary"><i class="fas fa-times-circle me-1"></i>Inactive</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-center">
+                                <div class="btn-group" role="group">
+                                    <button type="button" class="btn btn-outline-primary btn-sm" 
+                                            onclick="editSchedule({{ schedule.id }}, '{{ schedule.date.strftime('%Y-%m-%d') if schedule.date }}', '{{ schedule.location.id if schedule.location }}', '{{ schedule.type }}', '{{ schedule.start_time.strftime('%H:%M') if schedule.start_time }}', '{{ schedule.end_time.strftime('%H:%M') if schedule.end_time }}', '{{ schedule.description }}', {{ schedule.active|lower }})" 
+                                            data-bs-toggle="modal" data-bs-target="#editScheduleModal">
+                                        <i class="fas fa-edit"></i>
+                                    </button>
+                                    <button type="button" class="btn btn-outline-danger btn-sm" 
+                                            onclick="deleteSchedule({{ schedule.id }}, '{{ schedule.date.strftime('%Y-%m-%d') if schedule.date }}')">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    {% else %}
+                        <tr>
+                            <td colspan="7" class="text-center py-4 text-muted">
+                                <i class="fas fa-calendar-times fa-2x mb-2"></i>
+                                <p>No schedules found. Click "Add Schedule" to create your first schedule.</p>
+                            </td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Add Schedule Modal -->
+<div class="modal fade" id="addScheduleModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title"><i class="fas fa-plus me-2"></i>Add New Schedule</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="{{ url_for('admin.new_schedule') }}">
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="date" class="form-label">Date <span class="text-danger">*</span></label>
+                            <input type="date" class="form-control" id="date" name="date" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="location_id" class="form-label">Location <span class="text-danger">*</span></label>
+                            <select class="form-select" id="location_id" name="location_id" required>
+                                <option value="">Select Location</option>
+                                {% for location in locations %}
+                                <option value="{{ location.id }}">{{ location.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <label for="type" class="form-label">Activity Type</label>
+                            <select class="form-select" id="type" name="type">
+                                <option value="General">General</option>
+                                <option value="Community Service">Community Service</option>
+                                <option value="Health">Health</option>
+                                <option value="Education">Education</option>
+                                <option value="Agriculture">Agriculture</option>
+                                <option value="Infrastructure">Infrastructure</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label for="start_time" class="form-label">Start Time <span class="text-danger">*</span></label>
+                            <input type="time" class="form-control" id="start_time" name="start_time" required>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label for="end_time" class="form-label">End Time <span class="text-danger">*</span></label>
+                            <input type="time" class="form-control" id="end_time" name="end_time" required>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="description" class="form-label">Description</label>
+                        <textarea class="form-control" id="description" name="description" rows="3" placeholder="Enter schedule description..."></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="active" name="active" checked>
+                            <label class="form-check-label" for="active">
+                                Active Schedule
+                            </label>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary"><i class="fas fa-save me-2"></i>Add Schedule</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Schedule Modal -->
+<div class="modal fade" id="editScheduleModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-warning text-dark">
+                <h5 class="modal-title"><i class="fas fa-edit me-2"></i>Edit Schedule</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" id="editScheduleForm">
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="edit_date" class="form-label">Date <span class="text-danger">*</span></label>
+                            <input type="date" class="form-control" id="edit_date" name="date" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="edit_location_id" class="form-label">Location <span class="text-danger">*</span></label>
+                            <select class="form-select" id="edit_location_id" name="location_id" required>
+                                <option value="">Select Location</option>
+                                {% for location in locations %}
+                                <option value="{{ location.id }}">{{ location.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <label for="edit_type" class="form-label">Activity Type</label>
+                            <select class="form-select" id="edit_type" name="type">
+                                <option value="General">General</option>
+                                <option value="Community Service">Community Service</option>
+                                <option value="Health">Health</option>
+                                <option value="Education">Education</option>
+                                <option value="Agriculture">Agriculture</option>
+                                <option value="Infrastructure">Infrastructure</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label for="edit_start_time" class="form-label">Start Time <span class="text-danger">*</span></label>
+                            <input type="time" class="form-control" id="edit_start_time" name="start_time" required>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label for="edit_end_time" class="form-label">End Time <span class="text-danger">*</span></label>
+                            <input type="time" class="form-control" id="edit_end_time" name="end_time" required>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="edit_description" class="form-label">Description</label>
+                        <textarea class="form-control" id="edit_description" name="description" rows="3" placeholder="Enter schedule description..."></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="edit_active" name="active">
+                            <label class="form-check-label" for="edit_active">
+                                Active Schedule
+                            </label>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-warning"><i class="fas fa-save me-2"></i>Update Schedule</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+// Search and Filter Functions
+document.addEventListener('DOMContentLoaded', function() {
+    const searchInput = document.getElementById('searchSchedule');
+    const locationFilter = document.getElementById('filterLocation');
+    const statusFilter = document.getElementById('filterStatus');
+    const table = document.getElementById('schedulesTable');
+    const rows = table.getElementsByTagName('tbody')[0].getElementsByTagName('tr');
+
+    function filterTable() {
+        const searchTerm = searchInput.value.toLowerCase();
+        const selectedLocation = locationFilter.value.toLowerCase();
+        const selectedStatus = statusFilter.value.toLowerCase();
+
+        Array.from(rows).forEach(row => {
+            const cells = row.getElementsByTagName('td');
+            if (cells.length === 1) return; // Skip "no data" row
+            
+            const date = cells[0].textContent.toLowerCase();
+            const location = cells[1].textContent.toLowerCase();
+            const type = cells[2].textContent.toLowerCase();
+            const status = cells[5].textContent.toLowerCase();
+
+            const matchesSearch = date.includes(searchTerm) || 
+                                location.includes(searchTerm) || 
+                                type.includes(searchTerm);
+            const matchesLocation = !selectedLocation || location.includes(selectedLocation);
+            const matchesStatus = !selectedStatus || status.includes(selectedStatus);
+
+            if (matchesSearch && matchesLocation && matchesStatus) {
+                row.style.display = '';
+            } else {
+                row.style.display = 'none';
+            }
+        });
+    }
+
+    searchInput.addEventListener('keyup', filterTable);
+    locationFilter.addEventListener('change', filterTable);
+    statusFilter.addEventListener('change', filterTable);
+});
+
+// Edit Schedule Function
+function editSchedule(id, date, locationId, type, startTime, endTime, description, active) {
+    document.getElementById('editScheduleForm').action = `/admin/schedules/${id}/edit`;
+    document.getElementById('edit_date').value = date;
+    document.getElementById('edit_location_id').value = locationId;
+    document.getElementById('edit_type').value = type;
+    document.getElementById('edit_start_time').value = startTime;
+    document.getElementById('edit_end_time').value = endTime;
+    document.getElementById('edit_description').value = description;
+    document.getElementById('edit_active').checked = active;
+}
+
+// Delete Schedule Function
+function deleteSchedule(id, date) {
+    if (confirm(`Are you sure you want to delete the schedule for ${date}? This action cannot be undone.`)) {
+        // Create a form to submit DELETE request
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = `/admin/schedules/${id}/delete`;
+        
+        const methodInput = document.createElement('input');
+        methodInput.type = 'hidden';
+        methodInput.name = '_method';
+        methodInput.value = 'DELETE';
+        form.appendChild(methodInput);
+        
+        document.body.appendChild(form);
+        form.submit();
+    }
+}
+</script>
+{% endblock %}

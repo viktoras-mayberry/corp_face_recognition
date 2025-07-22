@@ -1,0 +1,150 @@
+{% extends "admin/base.html" %}
+
+{% block title %}
+    {% if schedule %}Edit Schedule{% else %}New Schedule{% endif %}
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">
+                        <i class="fas fa-calendar-plus me-2"></i>
+                        {% if schedule %}Edit Schedule{% else %}Create New Schedule{% endif %}
+                    </h5>
+                    <a href="{{ url_for('admin.schedules') }}" class="btn btn-outline-secondary btn-sm">
+                        <i class="fas fa-arrow-left me-1"></i> Back to Schedules
+                    </a>
+                </div>
+                <div class="card-body">
+                    <form method="POST">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="schedule_date" class="form-label">
+                                        <i class="fas fa-calendar me-1"></i> Schedule Date
+                                    </label>
+                                    <input type="date" class="form-control" id="schedule_date" name="schedule_date" 
+                                           value="{{ schedule.schedule_date.strftime('%Y-%m-%d') if schedule else '' }}" 
+                                           required>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="location_id" class="form-label">
+                                        <i class="fas fa-map-marker-alt me-1"></i> Location
+                                    </label>
+                                    <select class="form-select" id="location_id" name="location_id" required>
+                                        <option value="">Select Location</option>
+                                        {% for location in locations %}
+                                        <option value="{{ location.id }}" 
+                                                {% if schedule and schedule.location_id == location.id %}selected{% endif %}>
+                                            {{ location.name }}
+                                        </option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    <label for="start_time" class="form-label">
+                                        <i class="fas fa-clock me-1"></i> Start Time
+                                    </label>
+                                    <input type="time" class="form-control" id="start_time" name="start_time" 
+                                           value="{{ schedule.start_time.strftime('%H:%M') if schedule else '' }}" 
+                                           required>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    <label for="end_time" class="form-label">
+                                        <i class="fas fa-clock me-1"></i> End Time
+                                    </label>
+                                    <input type="time" class="form-control" id="end_time" name="end_time" 
+                                           value="{{ schedule.end_time.strftime('%H:%M') if schedule else '' }}" 
+                                           required>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    <label for="activity_type" class="form-label">
+                                        <i class="fas fa-tasks me-1"></i> Activity Type
+                                    </label>
+                                    <select class="form-select" id="activity_type" name="activity_type" required>
+                                        <option value="">Select Activity Type</option>
+                                        <option value="CDS" {% if schedule and schedule.activity_type == 'CDS' %}selected{% endif %}>
+                                            Community Development Service (CDS)
+                                        </option>
+                                        <option value="Environmental Sanitation" {% if schedule and schedule.activity_type == 'Environmental Sanitation' %}selected{% endif %}>
+                                            Environmental Sanitation
+                                        </option>
+                                        <option value="Skill Development" {% if schedule and schedule.activity_type == 'Skill Development' %}selected{% endif %}>
+                                            Skill Development
+                                        </option>
+                                        <option value="Lecture/Seminar" {% if schedule and schedule.activity_type == 'Lecture/Seminar' %}selected{% endif %}>
+                                            Lecture/Seminar
+                                        </option>
+                                        <option value="Health Outreach" {% if schedule and schedule.activity_type == 'Health Outreach' %}selected{% endif %}>
+                                            Health Outreach
+                                        </option>
+                                        <option value="Other" {% if schedule and schedule.activity_type == 'Other' %}selected{% endif %}>
+                                            Other
+                                        </option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="description" class="form-label">
+                                <i class="fas fa-info-circle me-1"></i> Description
+                            </label>
+                            <textarea class="form-control" id="description" name="description" rows="4" 
+                                      placeholder="Enter additional details about the schedule (optional)">{{ schedule.description if schedule else '' }}</textarea>
+                        </div>
+
+                        <div class="d-flex justify-content-between">
+                            <a href="{{ url_for('admin.schedules') }}" class="btn btn-secondary">
+                                <i class="fas fa-times me-1"></i> Cancel
+                            </a>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save me-1"></i>
+                                {% if schedule %}Update Schedule{% else %}Create Schedule{% endif %}
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Validate end time is after start time
+    const startTime = document.getElementById('start_time');
+    const endTime = document.getElementById('end_time');
+    
+    function validateTimes() {
+        if (startTime.value && endTime.value) {
+            if (endTime.value <= startTime.value) {
+                endTime.setCustomValidity('End time must be after start time');
+            } else {
+                endTime.setCustomValidity('');
+            }
+        }
+    }
+    
+    startTime.addEventListener('change', validateTimes);
+    endTime.addEventListener('change', validateTimes);
+    
+    // Set minimum date to today
+    document.getElementById('schedule_date').min = new Date().toISOString().split('T')[0];
+});
+</script>
+{% endblock %}

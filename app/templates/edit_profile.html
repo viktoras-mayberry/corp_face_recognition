@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+
+{% block title %}Edit Profile - NYSC Corps Attendance System{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>
+            <i class="fas fa-user-edit me-2"></i>
+            Edit Profile
+        </h2>
+        <a href="{{ url_for('main.profile') }}" class="btn btn-secondary btn-sm">
+            <i class="fas fa-arrow-left me-1"></i>Back to Profile
+        </a>
+    </div>
+    <div class="card">
+        <div class="card-header bg-primary text-white">
+            <h5 class="mb-0">Update Your Details</h5>
+        </div>
+        <div class="card-body">
+            <form method="POST" enctype="multipart/form-data">
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <label for="full_name" class="form-label">Full Name</label>
+                        <input type="text" class="form-control" id="full_name" name="full_name" value="{{ user.full_name }}" required>
+                    </div>
+                    <div class="col-md-6">
+                        <label for="phone" class="form-label">Phone</label>
+                        <input type="text" class="form-control" id="phone" name="phone" value="{{ user.phone }}">
+                    </div>
+                </div>
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <label for="ppa_name" class="form-label">PPA Name</label>
+                        <input type="text" class="form-control" id="ppa_name" name="ppa_name" value="{{ user.ppa_name }}">
+                    </div>
+                    <div class="col-md-6">
+                        <label for="local_government" class="form-label">Local Government</label>
+                        <input type="text" class="form-control" id="local_government" name="local_government" value="{{ user.local_government }}">
+                    </div>
+                </div>
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <label for="batch" class="form-label">Batch</label>
+                        <input type="text" class="form-control" id="batch" name="batch" value="{{ user.batch }}">
+                    </div>
+                    <div class="col-md-6">
+                        <label for="face_image" class="form-label">Update Face Image</label>
+                        <input type="file" class="form-control" id="face_image" name="face_image" accept="image/*">
+                        <div class="form-text">Upload a clear face image for attendance recognition. Leave blank to keep current image.</div>
+                    </div>
+                </div>
+                <button type="submit" class="btn btn-success">
+                    <i class="fas fa-save me-1"></i>Save Changes
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %} 

@@ -1,0 +1,561 @@
+{% extends "admin/base.html" %}
+
+{% block title %}CD Locations - Admin - NYSC Corps Attendance System{% endblock %}
+
+{% block head %}
+{{ super() }}
+<!-- Leaflet CSS -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+     integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+     crossorigin=""/>
+<!-- Leaflet JavaScript -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+     integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+     crossorigin=""></script>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>
+            <i class="fas fa-map-marker-alt me-2"></i>
+            Community Development Locations
+        </h2>
+        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addLocationModal">
+            <i class="fas fa-plus me-2"></i>Add Location
+        </button>
+    </div>
+
+<div class="d-flex mb-4">
+        <input class="form-control me-2" type="search" placeholder="Search by name or address" aria-label="Search">
+        <button class="btn btn-outline-success" type="button">Search</button>
+    </div>
+
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Name</th>
+                <th>Address</th>
+                <th>Capacity</th>
+                <th>Status</th>
+                <th>Created Date</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for location in locations %}
+            <tr>
+                <td>{{ location.id }}</td>
+                <td>{{ location.name }}</td>
+                <td>{{ location.address }}</td>
+                <td>{{ location.capacity }}</td>
+                <td>{{ "Active" if location.active else "Inactive" }}</td>
+                <td>{{ location.created_at.strftime('%Y-%m-%d') }}</td>
+                <td>
+                    <div class="btn-group" role="group">
+                        <button type="button" class="btn btn-info btn-sm" onclick="viewLocation({{ location.id }})" title="View Details">
+                            <i class="fas fa-eye"></i>
+                        </button>
+                        <button type="button" class="btn btn-warning btn-sm" onclick="editLocation({{ location.id }})" 
+                            data-id="{{ location.id }}"
+                            data-name="{{ location.name }}"
+                            data-address="{{ location.address }}"
+                            data-capacity="{{ location.capacity or '' }}"
+                            data-description="{{ location.description or '' }}"
+                            data-active="{{ location.active|lower }}"
+                            data-latitude="{{ location.latitude }}"
+                            data-longitude="{{ location.longitude }}"
+                            data-radius="{{ location.radius }}"
+                            title="Edit Location">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                        <button type="button" class="btn btn-danger btn-sm" onclick="deleteLocation({{ location.id }}, '{{ location.name }}')" title="Delete Location">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <!-- Add Location Modal -->
+    <div class="modal fade" id="addLocationModal" tabindex="-1" aria-labelledby="addLocationLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="addLocationLabel">
+                        <i class="fas fa-plus me-2"></i>Add New Location
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <form id="addLocationForm" action="{{ url_for('admin.add_location') }}" method="POST">
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label for="addLocationName" class="form-label">Name *</label>
+                            <input type="text" class="form-control" id="addLocationName" name="name" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="addLocationAddress" class="form-label">Address *</label>
+                            <textarea class="form-control" id="addLocationAddress" name="address" rows="2" required></textarea>
+                        </div>
+                        <div class="mb-3">
+                            <label for="addLocationCapacity" class="form-label">Capacity</label>
+                            <input type="number" class="form-control" id="addLocationCapacity" name="capacity" min="1">
+                        </div>
+                        <div class="mb-3">
+                            <label for="addLocationDescription" class="form-label">Description</label>
+                            <textarea class="form-control" id="addLocationDescription" name="description" rows="3"></textarea>
+                        </div>
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label for="addLocationLatitude" class="form-label">Latitude</label>
+                                <input type="number" step="any" class="form-control" id="addLocationLatitude" name="latitude" placeholder="e.g., 6.5244">
+                            </div>
+                            <div class="col-md-6">
+                                <label for="addLocationLongitude" class="form-label">Longitude</label>
+                                <input type="number" step="any" class="form-control" id="addLocationLongitude" name="longitude" placeholder="e.g., 3.3792">
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="addLocationRadius" class="form-label">Attendance Radius (meters)</label>
+                            <input type="number" class="form-control" id="addLocationRadius" name="radius" min="1" max="1000" value="100" placeholder="100">
+                            <div class="form-text">Corps members must be within this radius to mark attendance</div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Location on Map</label>
+                            <div class="d-flex align-items-center mb-2">
+                                <button type="button" class="btn btn-outline-primary btn-sm me-2" id="useMyLocationBtn">
+                                    <i class="fas fa-crosshairs me-1"></i>Use My Location
+                                </button>
+                                <span class="form-text">Click to use your current location for this CD center.</span>
+                            </div>
+                            <div id="addLocationMap" style="height: 300px; width: 100%; border-radius: 5px;"></div>
+                            <div class="form-text mt-2">
+                                Click on the map to set location coordinates, or enter latitude/longitude manually above.
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="addLocationActive" name="active" checked>
+                                <label class="form-check-label" for="addLocationActive">
+                                    Active Location
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save me-2"></i>Add Location
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Location Modal -->
+    <div class="modal fade" id="editLocationModal" tabindex="-1" aria-labelledby="editLocationLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="editLocationLabel">
+                        <i class="fas fa-edit me-2"></i>Edit Location
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <form id="editLocationForm" method="POST">
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label for="editLocationName" class="form-label">Name *</label>
+                            <input type="text" class="form-control" id="editLocationName" name="name" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="editLocationAddress" class="form-label">Address *</label>
+                            <textarea class="form-control" id="editLocationAddress" name="address" rows="2" required></textarea>
+                        </div>
+                        <div class="mb-3">
+                            <label for="editLocationCapacity" class="form-label">Capacity</label>
+                            <input type="number" class="form-control" id="editLocationCapacity" name="capacity" min="1">
+                        </div>
+                        <div class="mb-3">
+                            <label for="editLocationDescription" class="form-label">Description</label>
+                            <textarea class="form-control" id="editLocationDescription" name="description" rows="3"></textarea>
+                        </div>
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label for="editLocationLatitude" class="form-label">Latitude</label>
+                                <input type="number" step="any" class="form-control" id="editLocationLatitude" name="latitude" placeholder="e.g., 6.5244">
+                            </div>
+                            <div class="col-md-6">
+                                <label for="editLocationLongitude" class="form-label">Longitude</label>
+                                <input type="number" step="any" class="form-control" id="editLocationLongitude" name="longitude" placeholder="e.g., 3.3792">
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="editLocationRadius" class="form-label">Attendance Radius (meters)</label>
+                            <input type="number" class="form-control" id="editLocationRadius" name="radius" min="1" max="1000" value="100" placeholder="100">
+                            <div class="form-text">Corps members must be within this radius to mark attendance</div>
+                        </div>
+                        <div class="mb-3">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="editLocationActive" name="active">
+                                <label class="form-check-label" for="editLocationActive">
+                                    Active Location
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-warning">
+                            <i class="fas fa-save me-2"></i>Update Location
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Search functionality
+document.addEventListener('DOMContentLoaded', function() {
+    const searchInput = document.querySelector('input[type="search"]');
+    const searchButton = document.querySelector('.btn-outline-success');
+    const table = document.querySelector('.table tbody');
+    
+    function performSearch() {
+        const searchTerm = searchInput.value.toLowerCase().trim();
+        const rows = table.querySelectorAll('tr');
+        
+        rows.forEach(row => {
+            const name = row.cells[1]?.textContent.toLowerCase() || '';
+            const address = row.cells[2]?.textContent.toLowerCase() || '';
+            const shouldShow = name.includes(searchTerm) || address.includes(searchTerm) || searchTerm === '';
+            row.style.display = shouldShow ? '' : 'none';
+        });
+    }
+    
+    searchInput.addEventListener('input', performSearch);
+    searchButton.addEventListener('click', performSearch);
+    
+    // Clear search on escape
+    searchInput.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            searchInput.value = '';
+            performSearch();
+        }
+    });
+});
+
+// View location function
+function viewLocation(id) {
+    // Get location data from table row
+    const button = document.querySelector(`button[onclick="viewLocation(${id})"]`);
+    const row = button.closest('tr');
+    const cells = row.querySelectorAll('td');
+    
+    const locationData = {
+        id: cells[0].textContent,
+        name: cells[1].textContent,
+        address: cells[2].textContent,
+        capacity: cells[3].textContent,
+        status: cells[4].textContent,
+        createdDate: cells[5].textContent
+    };
+    
+    // Create and show view modal
+    const modalHtml = `
+        <div class="modal fade" id="viewLocationModal" tabindex="-1">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">
+                            <i class="fas fa-eye me-2"></i>Location Details
+                        </h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <p><strong>ID:</strong> ${locationData.id}</p>
+                                <p><strong>Name:</strong> ${locationData.name}</p>
+                                <p><strong>Status:</strong> 
+                                    <span class="badge ${locationData.status === 'Active' ? 'bg-success' : 'bg-secondary'}">
+                                        ${locationData.status}
+                                    </span>
+                                </p>
+                            </div>
+                            <div class="col-md-6">
+                                <p><strong>Capacity:</strong> ${locationData.capacity || 'Not specified'}</p>
+                                <p><strong>Created:</strong> ${locationData.createdDate}</p>
+                            </div>
+                        </div>
+                        <div class="row mt-3">
+                            <div class="col-12">
+                                <p><strong>Address:</strong></p>
+                                <p class="bg-light p-2 rounded">${locationData.address}</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    // Remove existing modal if any
+    const existingModal = document.getElementById('viewLocationModal');
+    if (existingModal) {
+        existingModal.remove();
+    }
+    
+    // Add modal to DOM and show
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+    const modal = new bootstrap.Modal(document.getElementById('viewLocationModal'));
+    modal.show();
+    
+    // Clean up modal after hide
+    document.getElementById('viewLocationModal').addEventListener('hidden.bs.modal', function() {
+        this.remove();
+    });
+}
+
+// Edit location function
+function editLocation(id) {
+    const button = document.querySelector(`button[data-id="${id}"]`);
+    
+    // Populate edit form with current data
+    document.getElementById('editLocationName').value = button.getAttribute('data-name');
+    document.getElementById('editLocationAddress').value = button.getAttribute('data-address');
+    document.getElementById('editLocationCapacity').value = button.getAttribute('data-capacity');
+    document.getElementById('editLocationDescription').value = button.getAttribute('data-description');
+    document.getElementById('editLocationActive').checked = button.getAttribute('data-active') === 'true';
+    document.getElementById('editLocationLatitude').value = button.getAttribute('data-latitude') || '';
+    document.getElementById('editLocationLongitude').value = button.getAttribute('data-longitude') || '';
+    document.getElementById('editLocationRadius').value = button.getAttribute('data-radius') || '100';
+    
+    // Set form action
+    document.getElementById('editLocationForm').action = `/admin/locations/${id}/edit`;
+    
+    // Show modal
+    const modal = new bootstrap.Modal(document.getElementById('editLocationModal'));
+    modal.show();
+}
+
+// Delete location function
+function deleteLocation(id, name) {
+    if (confirm(`Are you sure you want to delete the location "${name}"?\n\nThis action cannot be undone and may affect existing schedules.`)) {
+        // Create and submit delete form
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = `/admin/locations/${id}/delete`;
+        form.style.display = 'none';
+        
+        // Add CSRF token if available
+        const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+        if (csrfToken) {
+            const csrfInput = document.createElement('input');
+            csrfInput.type = 'hidden';
+            csrfInput.name = 'csrf_token';
+            csrfInput.value = csrfToken;
+            form.appendChild(csrfInput);
+        }
+        
+        document.body.appendChild(form);
+        form.submit();
+    }
+}
+
+// Map functionality
+let addLocationMap = null;
+let addLocationMarker = null;
+
+function initializeAddLocationMap() {
+    // Default location (Nigeria - Lagos)
+    const defaultLat = 6.5244;
+    const defaultLng = 3.3792;
+    
+    // Initialize map
+    addLocationMap = L.map('addLocationMap').setView([defaultLat, defaultLng], 13);
+    
+    // Add tile layer
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap contributors'
+    }).addTo(addLocationMap);
+    
+    // Add click event to map
+    addLocationMap.on('click', function(e) {
+        const lat = e.latlng.lat;
+        const lng = e.latlng.lng;
+        
+        // Update form fields
+        document.getElementById('addLocationLatitude').value = lat.toFixed(6);
+        document.getElementById('addLocationLongitude').value = lng.toFixed(6);
+        
+        // Remove existing marker
+        if (addLocationMarker) {
+            addLocationMap.removeLayer(addLocationMarker);
+        }
+        
+        // Add new marker
+        addLocationMarker = L.marker([lat, lng]).addTo(addLocationMap);
+        addLocationMarker.bindPopup(`<b>Selected Location</b><br>Lat: ${lat.toFixed(6)}<br>Lng: ${lng.toFixed(6)}`).openPopup();
+        
+        // Update attendance radius circle if exists
+        updateAttendanceRadius();
+    });
+    
+    // Listen for manual coordinate changes
+    const latInput = document.getElementById('addLocationLatitude');
+    const lngInput = document.getElementById('addLocationLongitude');
+    
+    function updateMapFromInputs() {
+        const lat = parseFloat(latInput.value);
+        const lng = parseFloat(lngInput.value);
+        
+        if (!isNaN(lat) && !isNaN(lng)) {
+            // Update map view
+            addLocationMap.setView([lat, lng], 15);
+            
+            // Remove existing marker
+            if (addLocationMarker) {
+                addLocationMap.removeLayer(addLocationMarker);
+            }
+            
+            // Add new marker
+            addLocationMarker = L.marker([lat, lng]).addTo(addLocationMap);
+            addLocationMarker.bindPopup(`<b>Selected Location</b><br>Lat: ${lat.toFixed(6)}<br>Lng: ${lng.toFixed(6)}`).openPopup();
+            
+            // Update attendance radius circle
+            updateAttendanceRadius();
+        }
+    }
+    
+    latInput.addEventListener('change', updateMapFromInputs);
+    lngInput.addEventListener('change', updateMapFromInputs);
+}
+
+// Function to update attendance radius circle
+let radiusCircle = null;
+function updateAttendanceRadius() {
+    const lat = parseFloat(document.getElementById('addLocationLatitude').value);
+    const lng = parseFloat(document.getElementById('addLocationLongitude').value);
+    const radius = parseFloat(document.getElementById('addLocationRadius').value) || 100;
+    
+    if (!isNaN(lat) && !isNaN(lng)) {
+        // Remove existing circle
+        if (radiusCircle) {
+            addLocationMap.removeLayer(radiusCircle);
+        }
+        
+        // Add new radius circle
+        radiusCircle = L.circle([lat, lng], {
+            color: 'red',
+            fillColor: '#f03',
+            fillOpacity: 0.2,
+            radius: radius
+        }).addTo(addLocationMap);
+        
+        radiusCircle.bindTooltip(`Attendance Radius: ${radius}m`);
+    }
+}
+
+// Form submission handlers
+document.addEventListener('DOMContentLoaded', function() {
+    // Add location form
+    const addForm = document.getElementById('addLocationForm');
+    if (addForm) {
+        addForm.addEventListener('submit', function(e) {
+            const submitButton = this.querySelector('button[type="submit"]');
+            submitButton.disabled = true;
+            submitButton.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Adding...';
+        });
+    }
+    
+    // Edit location form
+    const editForm = document.getElementById('editLocationForm');
+    if (editForm) {
+        editForm.addEventListener('submit', function(e) {
+            const submitButton = this.querySelector('button[type="submit"]');
+            submitButton.disabled = true;
+            submitButton.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Updating...';
+        });
+    }
+    
+    // Initialize map when Add Location modal is shown
+    document.getElementById('addLocationModal')?.addEventListener('shown.bs.modal', function() {
+        setTimeout(() => {
+            initializeAddLocationMap();
+            
+            // Add radius input change listener
+            const radiusInput = document.getElementById('addLocationRadius');
+            radiusInput.addEventListener('input', updateAttendanceRadius);
+
+            // Use My Location button
+            const useMyLocationBtn = document.getElementById('useMyLocationBtn');
+            if (useMyLocationBtn) {
+                useMyLocationBtn.addEventListener('click', function() {
+                    if (navigator.geolocation) {
+                        useMyLocationBtn.disabled = true;
+                        useMyLocationBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Locating...';
+                        navigator.geolocation.getCurrentPosition(function(position) {
+                            const lat = position.coords.latitude;
+                            const lng = position.coords.longitude;
+                            document.getElementById('addLocationLatitude').value = lat.toFixed(6);
+                            document.getElementById('addLocationLongitude').value = lng.toFixed(6);
+                            if (addLocationMap) {
+                                addLocationMap.setView([lat, lng], 16);
+                                if (addLocationMarker) {
+                                    addLocationMap.removeLayer(addLocationMarker);
+                                }
+                                addLocationMarker = L.marker([lat, lng]).addTo(addLocationMap);
+                                addLocationMarker.bindPopup(`<b>Your Location</b><br>Lat: ${lat.toFixed(6)}<br>Lng: ${lng.toFixed(6)}`).openPopup();
+                                updateAttendanceRadius();
+                            }
+                            useMyLocationBtn.disabled = false;
+                            useMyLocationBtn.innerHTML = '<i class="fas fa-crosshairs me-1"></i>Use My Location';
+                        }, function(error) {
+                            alert('Unable to retrieve your location. Please allow location access or set manually.');
+                            useMyLocationBtn.disabled = false;
+                            useMyLocationBtn.innerHTML = '<i class="fas fa-crosshairs me-1"></i>Use My Location';
+                        });
+                    } else {
+                        alert('Geolocation is not supported by your browser.');
+                    }
+                });
+            }
+        }, 200); // Small delay to ensure modal is fully rendered
+    });
+    
+    // Reset forms when modals are hidden
+    document.getElementById('addLocationModal')?.addEventListener('hidden.bs.modal', function() {
+        const form = this.querySelector('form');
+        form.reset();
+        const submitButton = form.querySelector('button[type="submit"]');
+        submitButton.disabled = false;
+        submitButton.innerHTML = '<i class="fas fa-save me-2"></i>Add Location';
+        
+        // Clean up map
+        if (addLocationMap) {
+            addLocationMap.remove();
+            addLocationMap = null;
+            addLocationMarker = null;
+            radiusCircle = null;
+        }
+    });
+    
+    document.getElementById('editLocationModal')?.addEventListener('hidden.bs.modal', function() {
+        const form = this.querySelector('form');
+        const submitButton = form.querySelector('button[type="submit"]');
+        submitButton.disabled = false;
+        submitButton.innerHTML = '<i class="fas fa-save me-2"></i>Update Location';
+    });
+});
+</script>
+{% endblock %}
