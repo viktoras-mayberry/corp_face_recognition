@@ -4,7 +4,7 @@ from app.main import bp
 from app.models import User, Attendance, Location, CDSchedule
 from app.services.attendance_service import AttendanceService
 from app import db
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 
 @bp.route('/')
 def index():
@@ -16,7 +16,9 @@ def index():
 @bp.route('/dashboard')
 @login_required
 def dashboard():
-    """User dashboard"""
+    """User dashboard (non-admin only)"""
+    if current_user.is_admin:
+        return redirect(url_for('admin.attendance'))
     # Get today's schedules
     today_schedules = CDSchedule.query.filter_by(
         schedule_date=date.today(),
@@ -35,11 +37,55 @@ def dashboard():
     # Get user attendance statistics
     attendance_stats = current_user.get_attendance_summary()
     
+    # Get user attendance records for the last 30 days
+    attendance_records = Attendance.query.filter(
+        Attendance.user_id == current_user.id,
+        Attendance.attendance_date >= date.today() - timedelta(days=30)
+    ).order_by(Attendance.attendance_date.desc()).all()
+
     return render_template('dashboard.html', 
                          schedules=today_schedules, 
                          recent_attendance=recent_attendance,
                          announcements=announcements,
-                         attendance_stats=attendance_stats)
+                         attendance_stats=attendance_stats,
+                         attendance_records=attendance_records)
+
+@bp.route('/dashboard/download_report')
+@login_required
+def download_attendance_report():
+    """Download user's monthly attendance report as CSV."""
+    import csv
+    from io import StringIO
+    from flask import Response
+    from datetime import date, timedelta
+    from app.models import Attendance
+
+    start_date = date.today() - timedelta(days=30)
+    records = Attendance.query.filter(
+        Attendance.user_id == current_user.id,
+        Attendance.attendance_date >= start_date
+    ).order_by(Attendance.attendance_date.desc()).all()
+
+    si = StringIO()
+    writer = csv.writer(si)
+    writer.writerow(['Date', 'Status', 'Check In', 'Check Out', 'Location'])
+    for a in records:
+        writer.writerow([
+            a.attendance_date.strftime('%Y-%m-%d'),
+            a.status,
+            a.check_in_time.strftime('%H:%M') if a.check_in_time else '',
+            a.check_out_time.strftime('%H:%M') if a.check_out_time else '',
+            a.location.name if a.location else ''
+        ])
+    output = si.getvalue()
+    si.close()
+    return Response(
+        output,
+        mimetype='text/csv',
+        headers={
+            'Content-Disposition': f'attachment;filename=attendance_report_{current_user.state_code}.csv'
+        }
+    )
 
 @bp.route('/profile')
 @login_required

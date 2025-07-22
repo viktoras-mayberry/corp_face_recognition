@@ -4,7 +4,10 @@ from functools import wraps
 from app.admin import bp
 from app.models import User, Attendance, Location, CDSchedule
 from app import db
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
+from sqlalchemy import or_, and_
+import csv
+from flask import Response
 
 def admin_required(f):
     """Decorator to require admin access"""
@@ -12,28 +15,16 @@ def admin_required(f):
     def decorated_function(*args, **kwargs):
         if not current_user.is_authenticated or not current_user.is_admin:
             flash('Access denied. Admin privileges required.', 'error')
-            return redirect(url_for('main.dashboard'))
+            return redirect(url_for('main.index'))
         return f(*args, **kwargs)
     return decorated_function
 
 @bp.route('/')
 @login_required
 @admin_required
-def dashboard():
-    """Admin dashboard"""
-    # Get statistics
-    total_users = User.query.count()
-    active_users = User.query.filter_by(is_active=True).count()
-    total_locations = Location.query.count()
-    today_attendance = Attendance.query.filter(
-        Attendance.created_at >= datetime.combine(date.today(), datetime.min.time())
-    ).count()
-    
-    return render_template('admin/dashboard.html',
-                         total_users=total_users,
-                         active_users=active_users,
-                         total_locations=total_locations,
-                         today_attendance=today_attendance)
+def root_redirect():
+    """Redirect admin root to attendance records page instead of dashboard."""
+    return redirect(url_for('admin.attendance'))
 
 @bp.route('/users')
 @login_required
@@ -68,7 +59,11 @@ def toggle_user_status(user_id):
 def locations():
     """Manage locations"""
     locations = Location.query.order_by(Location.name).all()
-    return render_template('admin/locations.html', locations=locations)
+    location_map_data = [
+        {'name': loc.name, 'latitude': loc.latitude, 'longitude': loc.longitude}
+        for loc in locations if loc.latitude is not None and loc.longitude is not None
+    ]
+    return render_template('admin/locations.html', locations=locations, location_map_data=location_map_data)
 
 @bp.route('/locations/new', methods=['GET', 'POST'])
 @login_required
@@ -274,15 +269,181 @@ def delete_schedule(schedule_id):
 @login_required
 @admin_required
 def attendance():
-    """View all attendance records"""
+    """View all attendance records with robust filtering and search and real-time analytics"""
+    from sqlalchemy import or_, and_, func
+    from datetime import datetime, timedelta
     page = request.args.get('page', 1, type=int)
     per_page = 50
-    
-    attendance_records = Attendance.query.order_by(Attendance.created_at.desc()).paginate(
+    date_from = request.args.get('date_from')
+    date_to = request.args.get('date_to')
+    status = request.args.get('status')
+    location_id = request.args.get('location')
+    search = request.args.get('search', '').strip()
+
+    query = Attendance.query.join(User).join(Location)
+    if date_from:
+        query = query.filter(Attendance.attendance_date >= date_from)
+    if date_to:
+        query = query.filter(Attendance.attendance_date <= date_to)
+    if status:
+        query = query.filter(Attendance.status == status)
+    if location_id:
+        query = query.filter(Attendance.location_id == location_id)
+    if search:
+        query = query.filter(or_(
+            User.full_name.ilike(f'%{search}%'),
+            User.state_code.ilike(f'%{search}%'),
+            User.email.ilike(f'%{search}%')
+        ))
+    attendance_records = query.order_by(Attendance.created_at.desc()).paginate(
         page=page, per_page=per_page, error_out=False
     )
-    
-    return render_template('admin/attendance.html', attendance_records=attendance_records)
+    # Stats for dashboard
+    total_corps_members = User.query.filter_by(is_admin=False).count()
+    present_today = Attendance.query.filter(
+        Attendance.attendance_date == datetime.utcnow().date(),
+        Attendance.status == 'present'
+    ).count()
+    absent_today = total_corps_members - present_today
+    attendance_rate = f"{(present_today / total_corps_members * 100):.1f}%" if total_corps_members else '0%'
+    locations = Location.query.order_by(Location.name).all()
+
+    # Real-time analytics data
+    # 1. Attendance trend (last 7 days)
+    today = datetime.utcnow().date()
+    trend_labels = [(today - timedelta(days=i)).strftime('%a') for i in reversed(range(7))]
+    trend_data = []
+    for i in reversed(range(7)):
+        day = today - timedelta(days=i)
+        count = Attendance.query.filter(Attendance.attendance_date == day).count()
+        trend_data.append(count)
+    # 2. Present/Absent/Late breakdown (for current filters)
+    filtered = query
+    present_count = filtered.filter(Attendance.status == 'present').count()
+    absent_count = filtered.filter(Attendance.status == 'absent').count()
+    late_count = filtered.filter(Attendance.status == 'late').count()
+    pie_data = [present_count, absent_count, late_count]
+    # 3. Location-wise attendance (for current filters)
+    location_labels = [loc.name for loc in locations]
+    location_data = [filtered.filter(Attendance.location_id == loc.id).count() for loc in locations]
+
+    return render_template(
+        'admin/attendance.html',
+        attendance_records=attendance_records,
+        locations=locations,
+        total_corps_members=total_corps_members,
+        present_today=present_today,
+        absent_today=absent_today,
+        attendance_rate=attendance_rate,
+        trend_labels=trend_labels,
+        trend_data=trend_data,
+        pie_data=pie_data,
+        location_labels=location_labels,
+        location_data=location_data
+    )
+
+@bp.route('/attendance/<int:attendance_id>/delete', methods=['POST'])
+@login_required
+@admin_required
+def delete_attendance(attendance_id):
+    """Delete an attendance record"""
+    record = Attendance.query.get_or_404(attendance_id)
+    try:
+        db.session.delete(record)
+        db.session.commit()
+        flash('Attendance record deleted successfully.', 'success')
+        return redirect(url_for('admin.attendance') + '#success')
+    except Exception as e:
+        flash(f'Error deleting attendance record: {str(e)}', 'danger')
+        return redirect(url_for('admin.attendance') + '#error')
+
+@bp.route('/attendance/<int:attendance_id>/edit', methods=['GET', 'POST'])
+@login_required
+@admin_required
+def edit_attendance(attendance_id):
+    """Edit an attendance record"""
+    record = Attendance.query.get_or_404(attendance_id)
+    locations = Location.query.order_by(Location.name).all()
+    users = User.query.order_by(User.full_name).all()
+    if request.method == 'POST':
+        try:
+            record.user_id = request.form.get('user_id')
+            record.location_id = request.form.get('location_id')
+            record.attendance_date = request.form.get('date')
+            record.check_in_time = request.form.get('check_in_time') or None
+            record.check_out_time = request.form.get('check_out_time') or None
+            record.status = request.form.get('status')
+            record.recognition_method = request.form.get('attendance_method')
+            db.session.commit()
+            flash('Attendance record updated successfully.', 'success')
+            return redirect(url_for('admin.attendance') + '#success')
+        except Exception as e:
+            flash(f'Error updating attendance record: {str(e)}', 'danger')
+            return redirect(url_for('admin.attendance') + '#error')
+    return render_template('admin/edit_attendance_modal.html', record=record, locations=locations, users=users)
+
+@bp.route('/attendance/bulk_delete', methods=['POST'])
+@login_required
+@admin_required
+def bulk_delete_attendance():
+    ids = request.form.get('ids', '')
+    if not ids:
+        flash('No records selected.', 'danger')
+        return redirect(url_for('admin.attendance') + '#error')
+    id_list = [int(i) for i in ids.split(',') if i.isdigit()]
+    try:
+        Attendance.query.filter(Attendance.id.in_(id_list)).delete(synchronize_session=False)
+        db.session.commit()
+        flash(f'{len(id_list)} attendance records deleted.', 'success')
+        return redirect(url_for('admin.attendance') + '#success')
+    except Exception as e:
+        flash(f'Error deleting records: {str(e)}', 'danger')
+        return redirect(url_for('admin.attendance') + '#error')
+
+@bp.route('/attendance/export', methods=['GET'])
+@login_required
+@admin_required
+def export_attendance():
+    format = request.args.get('format', 'csv')
+    ids = request.args.get('ids', '')
+    date_from = request.args.get('date_from')
+    date_to = request.args.get('date_to')
+    status = request.args.get('status')
+    location_id = request.args.get('location')
+    search = request.args.get('search', '').strip()
+    query = Attendance.query.join(User).join(Location)
+    if ids:
+        id_list = [int(i) for i in ids.split(',') if i.isdigit()]
+        query = query.filter(Attendance.id.in_(id_list))
+    if date_from:
+        query = query.filter(Attendance.attendance_date >= date_from)
+    if date_to:
+        query = query.filter(Attendance.attendance_date <= date_to)
+    if status:
+        query = query.filter(Attendance.status == status)
+    if location_id:
+        query = query.filter(Attendance.location_id == location_id)
+    if search:
+        query = query.filter(or_(
+            User.full_name.ilike(f'%{search}%'),
+            User.state_code.ilike(f'%{search}%'),
+            User.email.ilike(f'%{search}%')
+        ))
+    records = query.order_by(Attendance.created_at.desc()).all()
+    if format == 'csv':
+        def generate():
+            yield 'Date,Corps Member,State Code,Location,Check-in,Check-out,Status,Method\n'
+            for r in records:
+                yield f'{r.attendance_date},{r.user.full_name},{r.user.state_code},{r.location.name if r.location else "N/A"},{r.check_in_time or ""},{r.check_out_time or ""},{r.status},{r.recognition_method}\n'
+        return Response(generate(), mimetype='text/csv', headers={"Content-Disposition": "attachment;filename=attendance.csv"})
+    elif format == 'excel':
+        # Placeholder: implement Excel export
+        return 'Excel export coming soon', 501
+    elif format == 'pdf':
+        # Placeholder: implement PDF export
+        return 'PDF export coming soon', 501
+    else:
+        return 'Invalid format', 400
 
 @bp.route('/reports')
 @login_required
@@ -299,32 +460,27 @@ def send_announcement():
     try:
         title = request.form.get('title', '').strip()
         message = request.form.get('message', '').strip()
-        announcement_type = request.form.get('type', 'info')
-        
+        priority = request.form.get('priority', 'low')
+        is_active = bool(request.form.get('is_active'))
         if not title or not message:
             flash('Title and message are required.', 'error')
-            return redirect(url_for('admin.dashboard'))
-        
-        # Create announcement
+            return redirect(url_for('admin.announcements'))
         from app.models import Announcement
         announcement = Announcement(
             title=title,
             message=message,
-            announcement_type=announcement_type,
-            is_active=True,
-            is_urgent=(announcement_type in ['warning', 'danger']),
+            priority=priority,
+            is_active=is_active,
+            is_urgent=(priority == 'high'),
             created_by=current_user.id
         )
-        
         db.session.add(announcement)
         db.session.commit()
-        
         flash(f'Announcement "{title}" has been sent successfully!', 'success')
-        return redirect(url_for('admin.dashboard'))
-        
+        return redirect(url_for('admin.announcements'))
     except Exception as e:
         flash(f'Error sending announcement: {str(e)}', 'error')
-        return redirect(url_for('admin.dashboard'))
+        return redirect(url_for('admin.announcements'))
 
 @bp.route('/announcements')
 @login_required
@@ -340,3 +496,80 @@ def announcements():
     )
     
     return render_template('admin/announcements.html', announcements=announcements)
+
+@bp.route('/announcement/<int:id>/toggle', methods=['POST'])
+@login_required
+@admin_required
+def toggle_announcement(id):
+    from app.models import Announcement
+    announcement = Announcement.query.get_or_404(id)
+    announcement.is_active = not announcement.is_active
+    db.session.commit()
+    flash(f'Announcement "{announcement.title}" has been {"activated" if announcement.is_active else "deactivated"}.', 'success')
+    return redirect(url_for('admin.announcements'))
+
+@bp.route('/announcement/<int:id>/delete', methods=['POST'])
+@login_required
+@admin_required
+def delete_announcement(id):
+    from app.models import Announcement
+    announcement = Announcement.query.get_or_404(id)
+    db.session.delete(announcement)
+    db.session.commit()
+    flash(f'Announcement "{announcement.title}" deleted.', 'success')
+    return redirect(url_for('admin.announcements'))
+
+@bp.route('/announcement/<int:id>/edit', methods=['POST'])
+@login_required
+@admin_required
+def edit_announcement(id):
+    from app.models import Announcement
+    announcement = Announcement.query.get_or_404(id)
+    announcement.title = request.form.get('title')
+    announcement.message = request.form.get('message')
+    announcement.priority = request.form.get('priority')
+    announcement.is_active = bool(request.form.get('is_active'))
+    announcement.is_urgent = (announcement.priority == 'high')
+    db.session.commit()
+    flash(f'Announcement "{announcement.title}" updated.', 'success')
+    return redirect(url_for('admin.announcements'))
+
+@bp.route('/attendance/add', methods=['GET', 'POST'])
+@login_required
+@admin_required
+def add_attendance():
+    users = User.query.order_by(User.full_name).all()
+    locations = Location.query.order_by(Location.name).all()
+    from datetime import date
+    today = date.today().isoformat()
+    if request.method == 'POST':
+        try:
+            user_id = request.form.get('user_id')
+            location_id = request.form.get('location_id')
+            attendance_date = request.form.get('date')
+            check_in_time = request.form.get('check_in_time')
+            check_out_time = request.form.get('check_out_time')
+            status = request.form.get('status')
+            recognition_method = request.form.get('attendance_method')
+            if not (user_id and location_id and attendance_date and status):
+                flash('All required fields must be filled.', 'danger')
+                return redirect(url_for('admin.attendance') + '#error')
+            from app.models import Attendance
+            from datetime import datetime
+            record = Attendance(
+                user_id=user_id,
+                location_id=location_id,
+                attendance_date=attendance_date,
+                check_in_time=datetime.combine(datetime.strptime(attendance_date, '%Y-%m-%d'), datetime.strptime(check_in_time, '%H:%M').time()) if check_in_time else None,
+                check_out_time=datetime.combine(datetime.strptime(attendance_date, '%Y-%m-%d'), datetime.strptime(check_out_time, '%H:%M').time()) if check_out_time else None,
+                status=status,
+                recognition_method=recognition_method or 'manual'
+            )
+            db.session.add(record)
+            db.session.commit()
+            flash('Attendance record added successfully.', 'success')
+            return redirect(url_for('admin.attendance') + '#success')
+        except Exception as e:
+            flash(f'Error adding attendance record: {str(e)}', 'danger')
+            return redirect(url_for('admin.attendance') + '#error')
+    return render_template('admin/add_attendance_modal.html', users=users, locations=locations, today=today)

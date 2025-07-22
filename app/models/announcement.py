@@ -12,6 +12,9 @@ class Announcement(db.Model):
     # Type of announcement (info, warning, success, danger)
     announcement_type = db.Column(db.String(20), default='info')
     
+    # Priority (low, medium, high)
+    priority = db.Column(db.String(20), default='low')
+    
     # Status
     is_active = db.Column(db.Boolean, default=True)
     is_urgent = db.Column(db.Boolean, default=False)

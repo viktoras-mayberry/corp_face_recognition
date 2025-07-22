@@ -10,6 +10,7 @@ A comprehensive web-based attendance tracking system designed for NYSC Corps Mem
 - **Comprehensive Dashboard**: User and admin dashboards with attendance analytics
 - **Notification System**: Email and SMS notifications for attendance events
 - **Attendance Reports**: Detailed reports and analytics
+- **Priority Announcements**: Admin announcements with priority levels for important notices
 - **Mobile Responsive**: Works on all devices
 - **Secure**: Account lockouts, password hashing, session management
 
@@ -159,6 +160,12 @@ MAX_CONTENT_LENGTH=16777216
    - Export data for analysis
    - Monitor attendance trends
 
+5. **Announcements Management**
+   - Create system-wide announcements
+   - Set priority levels (Low, Medium, High, Critical)
+   - Schedule announcements for specific dates
+   - Track announcement visibility and engagement
+
 ## Deployment
 
 ### Heroku Deployment
@@ -212,6 +219,11 @@ MAX_CONTENT_LENGTH=16777216
    flask db migrate -m "Initial migration"
    flask db upgrade
    ```
+
+3. **Recent Updates**
+   - Added priority system to announcements (v1.1)
+   - Enhanced admin dashboard with announcement management
+   - Improved notification system with priority-based alerts
 
 ## Camera Setup
 

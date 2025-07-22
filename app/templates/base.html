@@ -23,9 +23,11 @@
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav me-auto">
                     {% if current_user.is_authenticated %}
+                        {% if not current_user.is_admin %}
                         <li class="nav-item">
                             <a class="nav-link" href="{{ url_for('main.dashboard') }}">Dashboard</a>
                         </li>
+                        {% endif %}
                         <li class="nav-item">
                             <a class="nav-link" href="{{ url_for('main.schedule') }}">Schedule</a>
                         </li>
@@ -34,7 +36,7 @@
                         </li>
                         {% if current_user.is_admin %}
                             <li class="nav-item">
-                                <a class="nav-link" href="{{ url_for('admin.dashboard') }}">Admin</a>
+                                <a class="nav-link" href="{{ url_for('admin.attendance') }}">Admin</a>
                             </li>
                         {% endif %}
                     {% endif %}

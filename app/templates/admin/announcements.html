@@ -48,13 +48,13 @@
                             </td>
                             <td>
                                 <span class="badge bg-{{ 'danger' if announcement.priority == 'high' else 'warning' if announcement.priority == 'medium' else 'info' }}">
-                                    {{ announcement.priority.title() }}
+                                    {{ (announcement.priority or 'low')|title }}
                                 </span>
                             </td>
                             <td>
                                 {{ announcement.created_at.strftime('%Y-%m-%d %H:%M') }}
                                 <br>
-                                <small class="text-muted">by {{ announcement.created_by.full_name }}</small>
+                                <small class="text-muted">by {{ announcement.creator.full_name if announcement.creator else 'Admin' }}</small>
                             </td>
                             <td>
                                 <span class="badge bg-{{ 'success' if announcement.is_active else 'secondary' }}">
@@ -70,7 +70,6 @@
                                         <i class="fas fa-edit"></i>
                                     </button>
                                     <form method="POST" action="{{ url_for('admin.toggle_announcement', id=announcement.id) }}" style="display: inline;">
-                                        {{ csrf_token() }}
                                         <button type="submit" class="btn btn-outline-{{ 'secondary' if announcement.is_active else 'success' }}" 
                                                 title="{{ 'Deactivate' if announcement.is_active else 'Activate' }}">
                                             <i class="fas fa-{{ 'pause' if announcement.is_active else 'play' }}"></i>
@@ -78,7 +77,6 @@
                                     </form>
                                     <form method="POST" action="{{ url_for('admin.delete_announcement', id=announcement.id) }}" 
                                           style="display: inline;" onsubmit="return confirm('Are you sure you want to delete this announcement?')">
-                                        {{ csrf_token() }}
                                         <button type="submit" class="btn btn-outline-danger">
                                             <i class="fas fa-trash"></i>
                                         </button>
@@ -99,7 +97,7 @@
                                         <div class="mb-3">
                                             <label class="form-label fw-bold">Priority:</label>
                                             <span class="badge bg-{{ 'danger' if announcement.priority == 'high' else 'warning' if announcement.priority == 'medium' else 'info' }}">
-                                                {{ announcement.priority.title() }}
+                                                {{ (announcement.priority or 'low')|title }}
                                             </span>
                                         </div>
                                         <div class="mb-3">
@@ -113,7 +111,7 @@
                                             </div>
                                             <div class="col-md-6">
                                                 <label class="form-label fw-bold">Created by:</label>
-                                                <p>{{ announcement.created_by.full_name }}</p>
+                                                <p>{{ announcement.creator.full_name if announcement.creator else 'Admin' }}</p>
                                             </div>
                                         </div>
                                     </div>
@@ -126,7 +124,6 @@
                             <div class="modal-dialog modal-lg">
                                 <div class="modal-content">
                                     <form method="POST" action="{{ url_for('admin.edit_announcement', id=announcement.id) }}">
-                                        {{ csrf_token() }}
                                         <div class="modal-header">
                                             <h5 class="modal-title">Edit Announcement</h5>
                                             <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
@@ -182,7 +179,6 @@
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <form method="POST" action="{{ url_for('admin.send_announcement') }}">
-                {{ csrf_token() }}
                 <div class="modal-header">
                     <h5 class="modal-title">Add New Announcement</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>

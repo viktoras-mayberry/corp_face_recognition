@@ -7,6 +7,7 @@ from app.services.face_recognition_service import FaceRecognitionService
 from app import db
 from datetime import date, datetime
 import os
+from geopy.geocoders import Nominatim
 
 @bp.route('/attendance/mark', methods=['POST'])
 @login_required
@@ -174,3 +175,26 @@ def user_profile():
     except Exception as e:
         current_app.logger.error(f"Error fetching user profile: {str(e)}")
         return jsonify({'error': 'Internal server error'}), 500
+
+@bp.route('/geocode', methods=['POST'])
+def geocode_address():
+    """Geocode an address using Nominatim (OpenStreetMap) and return lat/lon."""
+    data = request.get_json() or request.form
+    address = data.get('address', '').strip()
+    if not address:
+        return jsonify({'error': 'Address is required'}), 400
+    try:
+        geolocator = Nominatim(user_agent="corps_attendance_system")
+        location = geolocator.geocode(address, timeout=10)
+        if location:
+            return jsonify({
+                'success': True,
+                'latitude': location.latitude,
+                'longitude': location.longitude,
+                'address': location.address
+            })
+        else:
+            return jsonify({'error': 'Address not found'}), 404
+    except Exception as e:
+        current_app.logger.error(f"Geocoding error: {str(e)}")
+        return jsonify({'error': 'Geocoding failed'}), 500

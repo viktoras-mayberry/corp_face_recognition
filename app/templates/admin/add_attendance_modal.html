@@ -1,0 +1,61 @@
+<form method="POST" action="">
+    <div class="modal-header">
+        <h5 class="modal-title">Add Attendance Record</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+    </div>
+    <div class="modal-body">
+        <div class="mb-3">
+            <label for="user_id" class="form-label">Corps Member</label>
+            <select class="form-select" id="user_id" name="user_id" required>
+                <option value="">Select Corps Member</option>
+                {% for user in users %}
+                    <option value="{{ user.id }}">{{ user.full_name }} ({{ user.state_code }})</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="mb-3">
+            <label for="location_id" class="form-label">Location</label>
+            <select class="form-select" id="location_id" name="location_id" required>
+                <option value="">Select Location</option>
+                {% for location in locations %}
+                    <option value="{{ location.id }}">{{ location.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="mb-3">
+            <label for="date" class="form-label">Date</label>
+            <input type="date" class="form-control" id="date" name="date" value="{{ today }}" required>
+        </div>
+        <div class="row">
+            <div class="col-md-6">
+                <label for="check_in_time" class="form-label">Check-in Time</label>
+                <input type="time" class="form-control" id="check_in_time" name="check_in_time">
+            </div>
+            <div class="col-md-6">
+                <label for="check_out_time" class="form-label">Check-out Time</label>
+                <input type="time" class="form-control" id="check_out_time" name="check_out_time">
+            </div>
+        </div>
+        <div class="mb-3 mt-3">
+            <label for="status" class="form-label">Status</label>
+            <select class="form-select" id="status" name="status" required>
+                <option value="">Select Status</option>
+                <option value="present">Present</option>
+                <option value="late">Late</option>
+                <option value="absent">Absent</option>
+            </select>
+        </div>
+        <div class="mb-3">
+            <label for="attendance_method" class="form-label">Method</label>
+            <select class="form-select" id="attendance_method" name="attendance_method">
+                <option value="manual">Manual Entry</option>
+                <option value="face_recognition">Face Recognition</option>
+                <option value="pin">PIN</option>
+            </select>
+        </div>
+    </div>
+    <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="submit" class="btn btn-primary">Add Record</button>
+    </div>
+</form> 

@@ -4,14 +4,10 @@
 
 {% block head %}
 {{ super() }}
-<!-- Leaflet CSS -->
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-     integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
-     crossorigin=""/>
-<!-- Leaflet JavaScript -->
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
-     integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
-     crossorigin=""></script>
+<!-- Leaflet.js CSS -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<!-- Leaflet.js JS -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 {% endblock %}
 
 {% block content %}
@@ -37,7 +33,10 @@
                 <th>ID</th>
                 <th>Name</th>
                 <th>Address</th>
+                <th>Local Govt</th>
+                <th>State</th>
                 <th>Capacity</th>
+                <th>Attendance Today</th>
                 <th>Status</th>
                 <th>Created Date</th>
                 <th>Actions</th>
@@ -49,8 +48,11 @@
                 <td>{{ location.id }}</td>
                 <td>{{ location.name }}</td>
                 <td>{{ location.address }}</td>
-                <td>{{ location.capacity }}</td>
-                <td>{{ "Active" if location.active else "Inactive" }}</td>
+                <td>{{ location.local_government }}</td>
+                <td>{{ location.state }}</td>
+                <td>{{ location.max_capacity or 'N/A' }}</td>
+                <td>{{ location.get_today_attendance_count() }}</td>
+                <td>{{ "Active" if location.is_active else "Inactive" }}</td>
                 <td>{{ location.created_at.strftime('%Y-%m-%d') }}</td>
                 <td>
                     <div class="btn-group" role="group">
@@ -58,15 +60,15 @@
                             <i class="fas fa-eye"></i>
                         </button>
                         <button type="button" class="btn btn-warning btn-sm" onclick="editLocation({{ location.id }})" 
-                            data-id="{{ location.id }}"
-                            data-name="{{ location.name }}"
-                            data-address="{{ location.address }}"
-                            data-capacity="{{ location.capacity or '' }}"
-                            data-description="{{ location.description or '' }}"
-                            data-active="{{ location.active|lower }}"
-                            data-latitude="{{ location.latitude }}"
-                            data-longitude="{{ location.longitude }}"
-                            data-radius="{{ location.radius }}"
+                            data-id="{{ location.id }}" 
+                            data-name="{{ location.name }}" 
+                            data-address="{{ location.address }}" 
+                            data-capacity="{{ location.max_capacity or '' }}" 
+                            data-description="{{ location.description or '' }}" 
+                            data-active="{{ location.is_active|lower }}" 
+                            data-latitude="{{ location.latitude }}" 
+                            data-longitude="{{ location.longitude }}" 
+                            data-radius="{{ location.radius }}" 
                             title="Edit Location">
                             <i class="fas fa-edit"></i>
                         </button>
@@ -90,7 +92,7 @@
                     </h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
-                <form id="addLocationForm" action="{{ url_for('admin.add_location') }}" method="POST">
+                <form id="addLocationForm" action="{{ url_for('admin.new_location') }}" method="POST">
                     <div class="modal-body">
                         <div class="mb-3">
                             <label for="addLocationName" class="form-label">Name *</label>
@@ -131,6 +133,7 @@
                                 </button>
                                 <span class="form-text">Click to use your current location for this CD center.</span>
                             </div>
+                            <input type="text" id="mapSearchInput" class="form-control mb-2" placeholder="Search for address or place...">
                             <div id="addLocationMap" style="height: 300px; width: 100%; border-radius: 5px;"></div>
                             <div class="form-text mt-2">
                                 Click on the map to set location coordinates, or enter latitude/longitude manually above.
@@ -198,6 +201,21 @@
                             <label for="editLocationRadius" class="form-label">Attendance Radius (meters)</label>
                             <input type="number" class="form-control" id="editLocationRadius" name="radius" min="1" max="1000" value="100" placeholder="100">
                             <div class="form-text">Corps members must be within this radius to mark attendance</div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Location on Map</label>
+                            <div class="d-flex align-items-center mb-2">
+                                <button type="button" class="btn btn-outline-primary btn-sm me-2" id="useMyLocationBtnEdit">
+                                    <i class="fas fa-crosshairs me-1"></i>Use My Location
+                                </button>
+                                <span class="form-text">Click to use your current location for this CD center.</span>
+                            </div>
+                            <input type="text" id="mapSearchInputEdit" class="form-control mb-2" placeholder="Search for address or place...">
+                            <div id="editLocationMap" style="height: 300px; width: 100%; border-radius: 5px;"></div>
+                            <div class="form-text mt-2">
+                                Click on the map to set location coordinates, or enter latitude/longitude manually above. <br>
+                                <b>Nearby Places:</b> <span id="nearbyPlaces"></span>
+                            </div>
                         </div>
                         <div class="mb-3">
                             <div class="form-check">
@@ -372,99 +390,163 @@ function deleteLocation(id, name) {
     }
 }
 
-// Map functionality
-let addLocationMap = null;
-let addLocationMarker = null;
-
-function initializeAddLocationMap() {
-    // Default location (Nigeria - Lagos)
-    const defaultLat = 6.5244;
-    const defaultLng = 3.3792;
-    
-    // Initialize map
-    addLocationMap = L.map('addLocationMap').setView([defaultLat, defaultLng], 13);
-    
-    // Add tile layer
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '© OpenStreetMap contributors'
-    }).addTo(addLocationMap);
-    
-    // Add click event to map
-    addLocationMap.on('click', function(e) {
-        const lat = e.latlng.lat;
-        const lng = e.latlng.lng;
-        
-        // Update form fields
-        document.getElementById('addLocationLatitude').value = lat.toFixed(6);
-        document.getElementById('addLocationLongitude').value = lng.toFixed(6);
-        
-        // Remove existing marker
-        if (addLocationMarker) {
-            addLocationMap.removeLayer(addLocationMarker);
-        }
-        
-        // Add new marker
-        addLocationMarker = L.marker([lat, lng]).addTo(addLocationMap);
-        addLocationMarker.bindPopup(`<b>Selected Location</b><br>Lat: ${lat.toFixed(6)}<br>Lng: ${lng.toFixed(6)}`).openPopup();
-        
-        // Update attendance radius circle if exists
-        updateAttendanceRadius();
-    });
-    
-    // Listen for manual coordinate changes
+// Leaflet.js for Add/Edit Location
+let mapAdd, markerAdd, autocompleteAdd;
+let mapEdit, markerEdit, autocompleteEdit;
+function initializeLeafletMapAdd() {
+    const defaultLat = 6.5244, defaultLng = 3.3792;
     const latInput = document.getElementById('addLocationLatitude');
     const lngInput = document.getElementById('addLocationLongitude');
-    
-    function updateMapFromInputs() {
+    const mapDiv = document.getElementById('addLocationMap');
+    const searchInput = document.getElementById('mapSearchInput');
+    if (!mapDiv) return;
+    mapAdd = L.map(mapDiv).setView([defaultLat, defaultLng], 13);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap contributors'
+    }).addTo(mapAdd);
+    markerAdd = L.marker([defaultLat, defaultLng], { draggable: true }).addTo(mapAdd);
+    markerAdd.on('dragend', function(e) {
+        latInput.value = e.target.getLatLng().lat.toFixed(6);
+        lngInput.value = e.target.getLatLng().lng.toFixed(6);
+    });
+    mapAdd.on('click', function(e) {
+        markerAdd.setLatLng(e.latlng);
+        latInput.value = e.latlng.lat.toFixed(6);
+        lngInput.value = e.latlng.lng.toFixed(6);
+    });
+    latInput.addEventListener('change', function() {
         const lat = parseFloat(latInput.value);
         const lng = parseFloat(lngInput.value);
-        
         if (!isNaN(lat) && !isNaN(lng)) {
-            // Update map view
-            addLocationMap.setView([lat, lng], 15);
-            
-            // Remove existing marker
-            if (addLocationMarker) {
-                addLocationMap.removeLayer(addLocationMarker);
-            }
-            
-            // Add new marker
-            addLocationMarker = L.marker([lat, lng]).addTo(addLocationMap);
-            addLocationMarker.bindPopup(`<b>Selected Location</b><br>Lat: ${lat.toFixed(6)}<br>Lng: ${lng.toFixed(6)}`).openPopup();
-            
-            // Update attendance radius circle
-            updateAttendanceRadius();
+            const pos = { lat: lat, lng: lng };
+            markerAdd.setLatLng(pos);
+            mapAdd.setView(pos, 16);
         }
-    }
-    
-    latInput.addEventListener('change', updateMapFromInputs);
-    lngInput.addEventListener('change', updateMapFromInputs);
-}
-
-// Function to update attendance radius circle
-let radiusCircle = null;
-function updateAttendanceRadius() {
-    const lat = parseFloat(document.getElementById('addLocationLatitude').value);
-    const lng = parseFloat(document.getElementById('addLocationLongitude').value);
-    const radius = parseFloat(document.getElementById('addLocationRadius').value) || 100;
-    
-    if (!isNaN(lat) && !isNaN(lng)) {
-        // Remove existing circle
-        if (radiusCircle) {
-            addLocationMap.removeLayer(radiusCircle);
+    });
+    lngInput.addEventListener('change', function() {
+        const lat = parseFloat(latInput.value);
+        const lng = parseFloat(lngInput.value);
+        if (!isNaN(lat) && !isNaN(lng)) {
+            const pos = { lat: lat, lng: lng };
+            markerAdd.setLatLng(pos);
+            mapAdd.setView(pos, 16);
         }
-        
-        // Add new radius circle
-        radiusCircle = L.circle([lat, lng], {
-            color: 'red',
-            fillColor: '#f03',
-            fillOpacity: 0.2,
-            radius: radius
-        }).addTo(addLocationMap);
-        
-        radiusCircle.bindTooltip(`Attendance Radius: ${radius}m`);
-    }
+    });
+    autocompleteAdd = new L.Control.Geocoder().addTo(mapAdd);
+    autocompleteAdd.on('markgeocode', function(e) {
+        const lat = e.geocode.center.lat;
+        const lng = e.geocode.center.lng;
+        latInput.value = lat.toFixed(6);
+        lngInput.value = lng.toFixed(6);
+        markerAdd.setLatLng({ lat: lat, lng: lng });
+        mapAdd.setView({ lat: lat, lng: lng }, 16);
+    });
+    // Use My Location
+    document.getElementById('useMyLocationBtn').onclick = function() {
+        if (navigator.geolocation) {
+            this.disabled = true;
+            this.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Locating...';
+            navigator.geolocation.getCurrentPosition(function(position) {
+                const lat = position.coords.latitude, lng = position.coords.longitude;
+                latInput.value = lat.toFixed(6);
+                lngInput.value = lng.toFixed(6);
+                const pos = { lat: lat, lng: lng };
+                markerAdd.setLatLng(pos);
+                mapAdd.setView(pos, 16);
+                document.getElementById('useMyLocationBtn').disabled = false;
+                document.getElementById('useMyLocationBtn').innerHTML = '<i class="fas fa-crosshairs me-1"></i>Use My Location';
+            }, function() {
+                alert('Unable to retrieve your location.');
+                document.getElementById('useMyLocationBtn').disabled = false;
+                document.getElementById('useMyLocationBtn').innerHTML = '<i class="fas fa-crosshairs me-1"></i>Use My Location';
+            });
+        }
+    };
 }
+function initializeLeafletMapEdit() {
+    const defaultLat = 6.5244, defaultLng = 3.3792;
+    const latInput = document.getElementById('editLocationLatitude');
+    const lngInput = document.getElementById('editLocationLongitude');
+    const mapDiv = document.getElementById('editLocationMap');
+    const searchInput = document.getElementById('mapSearchInputEdit');
+    if (!mapDiv) return;
+    let lat = parseFloat(latInput.value) || defaultLat;
+    let lng = parseFloat(lngInput.value) || defaultLng;
+    mapEdit = L.map(mapDiv).setView([lat, lng], 13);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap contributors'
+    }).addTo(mapEdit);
+    markerEdit = L.marker([lat, lng], { draggable: true }).addTo(mapEdit);
+    markerEdit.on('dragend', function(e) {
+        latInput.value = e.target.getLatLng().lat.toFixed(6);
+        lngInput.value = e.target.getLatLng().lng.toFixed(6);
+    });
+    mapEdit.on('click', function(e) {
+        markerEdit.setLatLng(e.latlng);
+        latInput.value = e.latlng.lat.toFixed(6);
+        lngInput.value = e.latlng.lng.toFixed(6);
+    });
+    latInput.addEventListener('change', function() {
+        const lat = parseFloat(latInput.value);
+        const lng = parseFloat(lngInput.value);
+        if (!isNaN(lat) && !isNaN(lng)) {
+            const pos = { lat: lat, lng: lng };
+            markerEdit.setLatLng(pos);
+            mapEdit.setView(pos, 16);
+        }
+    });
+    lngInput.addEventListener('change', function() {
+        const lat = parseFloat(latInput.value);
+        const lng = parseFloat(lngInput.value);
+        if (!isNaN(lat) && !isNaN(lng)) {
+            const pos = { lat: lat, lng: lng };
+            markerEdit.setLatLng(pos);
+            mapEdit.setView(pos, 16);
+        }
+    });
+    autocompleteEdit = new L.Control.Geocoder().addTo(mapEdit);
+    autocompleteEdit.on('markgeocode', function(e) {
+        const lat = e.geocode.center.lat;
+        const lng = e.geocode.center.lng;
+        latInput.value = lat.toFixed(6);
+        lngInput.value = lng.toFixed(6);
+        markerEdit.setLatLng({ lat: lat, lng: lng });
+        mapEdit.setView({ lat: lat, lng: lng }, 16);
+    });
+    // Use My Location
+    document.getElementById('useMyLocationBtnEdit').onclick = function() {
+        if (navigator.geolocation) {
+            this.disabled = true;
+            this.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Locating...';
+            navigator.geolocation.getCurrentPosition(function(position) {
+                const lat = position.coords.latitude, lng = position.coords.longitude;
+                latInput.value = lat.toFixed(6);
+                lngInput.value = lng.toFixed(6);
+                const pos = { lat: lat, lng: lng };
+                markerEdit.setLatLng(pos);
+                mapEdit.setView(pos, 16);
+                document.getElementById('useMyLocationBtnEdit').disabled = false;
+                document.getElementById('useMyLocationBtnEdit').innerHTML = '<i class="fas fa-crosshairs me-1"></i>Use My Location';
+            }, function() {
+                alert('Unable to retrieve your location.');
+                document.getElementById('useMyLocationBtnEdit').disabled = false;
+                document.getElementById('useMyLocationBtnEdit').innerHTML = '<i class="fas fa-crosshairs me-1"></i>Use My Location';
+            });
+        }
+    };
+}
+document.addEventListener('DOMContentLoaded', function() {
+    document.getElementById('addLocationModal')?.addEventListener('shown.bs.modal', function() {
+        setTimeout(() => {
+            initializeLeafletMapAdd();
+        }, 200);
+    });
+    document.getElementById('editLocationModal')?.addEventListener('shown.bs.modal', function() {
+        setTimeout(() => {
+            initializeLeafletMapEdit();
+        }, 200);
+    });
+});
 
 // Form submission handlers
 document.addEventListener('DOMContentLoaded', function() {
@@ -488,51 +570,6 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
-    // Initialize map when Add Location modal is shown
-    document.getElementById('addLocationModal')?.addEventListener('shown.bs.modal', function() {
-        setTimeout(() => {
-            initializeAddLocationMap();
-            
-            // Add radius input change listener
-            const radiusInput = document.getElementById('addLocationRadius');
-            radiusInput.addEventListener('input', updateAttendanceRadius);
-
-            // Use My Location button
-            const useMyLocationBtn = document.getElementById('useMyLocationBtn');
-            if (useMyLocationBtn) {
-                useMyLocationBtn.addEventListener('click', function() {
-                    if (navigator.geolocation) {
-                        useMyLocationBtn.disabled = true;
-                        useMyLocationBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Locating...';
-                        navigator.geolocation.getCurrentPosition(function(position) {
-                            const lat = position.coords.latitude;
-                            const lng = position.coords.longitude;
-                            document.getElementById('addLocationLatitude').value = lat.toFixed(6);
-                            document.getElementById('addLocationLongitude').value = lng.toFixed(6);
-                            if (addLocationMap) {
-                                addLocationMap.setView([lat, lng], 16);
-                                if (addLocationMarker) {
-                                    addLocationMap.removeLayer(addLocationMarker);
-                                }
-                                addLocationMarker = L.marker([lat, lng]).addTo(addLocationMap);
-                                addLocationMarker.bindPopup(`<b>Your Location</b><br>Lat: ${lat.toFixed(6)}<br>Lng: ${lng.toFixed(6)}`).openPopup();
-                                updateAttendanceRadius();
-                            }
-                            useMyLocationBtn.disabled = false;
-                            useMyLocationBtn.innerHTML = '<i class="fas fa-crosshairs me-1"></i>Use My Location';
-                        }, function(error) {
-                            alert('Unable to retrieve your location. Please allow location access or set manually.');
-                            useMyLocationBtn.disabled = false;
-                            useMyLocationBtn.innerHTML = '<i class="fas fa-crosshairs me-1"></i>Use My Location';
-                        });
-                    } else {
-                        alert('Geolocation is not supported by your browser.');
-                    }
-                });
-            }
-        }, 200); // Small delay to ensure modal is fully rendered
-    });
-    
     // Reset forms when modals are hidden
     document.getElementById('addLocationModal')?.addEventListener('hidden.bs.modal', function() {
         const form = this.querySelector('form');
@@ -542,11 +579,11 @@ document.addEventListener('DOMContentLoaded', function() {
         submitButton.innerHTML = '<i class="fas fa-save me-2"></i>Add Location';
         
         // Clean up map
-        if (addLocationMap) {
-            addLocationMap.remove();
-            addLocationMap = null;
-            addLocationMarker = null;
-            radiusCircle = null;
+        if (mapAdd) {
+            mapAdd.remove();
+            mapAdd = null;
+            markerAdd = null;
+            autocompleteAdd = null;
         }
     });
     

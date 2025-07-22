@@ -125,18 +125,19 @@ def register():
     
     return render_template('auth/register.html')
 
-@bp.route('/verify_pin', methods=['POST'])
+@bp.route('/verify_pin', methods=['GET', 'POST'])
 def verify_pin():
     """Verify user PIN for sensitive operations"""
     if not current_user.is_authenticated:
         return redirect(url_for('auth.login'))
-    
-    pin = request.form.get('pin', '').strip()
-    
-    if current_user.check_pin(pin):
-        session['pin_verified'] = True
-        flash('PIN verified successfully.', 'success')
-        return redirect(request.args.get('next', url_for('main.dashboard')))
-    else:
-        flash('Invalid PIN. Please try again.', 'error')
-        return redirect(request.args.get('next', url_for('main.dashboard')))
+
+    if request.method == 'POST':
+        pin = request.form.get('pin', '').strip()
+        if current_user.check_pin(pin):
+            session['pin_verified'] = True
+            flash('PIN verified successfully.', 'success')
+            return redirect(request.args.get('next', url_for('main.dashboard')))
+        else:
+            flash('Invalid PIN. Please try again.', 'error')
+            return redirect(request.args.get('next', url_for('main.dashboard')))
+    return render_template('auth/verify_pin.html')
