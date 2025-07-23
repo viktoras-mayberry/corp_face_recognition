@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: corps-attendance-system
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn run:app
+    envVars:
+      - key: FLASK_CONFIG
+        value: production
+      - key: FLASK_ENV
+        value: production
+      - key: SECRET_KEY
+        generateValue: true
+      - key: JWT_SECRET_KEY
+        generateValue: true
+      - key: LOG_TO_STDOUT
+        value: "1"
+
+databases:
+  - name: corps-attendance-db
+    databaseName: corps_attendance
+    user: corps_user
