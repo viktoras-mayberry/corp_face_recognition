@@ -1,0 +1,31 @@
+version: '3.8'
+
+services:
+  web:
+    build: .
+    ports:
+      - "5000:5000"
+    environment:
+      - FLASK_CONFIG=production
+      - SECRET_KEY=dev-secret-key
+      - JWT_SECRET_KEY=dev-jwt-key
+      - DATABASE_URL=postgresql://postgres:password@db:5432/corps_attendance
+      - LOG_TO_STDOUT=1
+    depends_on:
+      - db
+    volumes:
+      - ./data:/app/data
+
+  db:
+    image: postgres:13
+    environment:
+      - POSTGRES_DB=corps_attendance
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+volumes:
+  postgres_data:
