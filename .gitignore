@@ -90,3 +90,6 @@ migrations/versions/*
 
 # Local development
 *.local
+
+# Requirements backup
+requirements_clean.txt

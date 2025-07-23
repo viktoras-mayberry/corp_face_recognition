@@ -1,0 +1,398 @@
+{% extends "admin/base.html" %}
+
+{% block title %}Reports - Admin Panel{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1 class="h3 mb-0 text-gray-800">
+                    <i class="fas fa-chart-line me-2"></i>Reports & Analytics
+                </h1>
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb mb-0">
+                        <li class="breadcrumb-item"><a href="{{ url_for('admin.root_redirect') }}">Admin</a></li>
+                        <li class="breadcrumb-item active">Reports</li>
+                    </ol>
+                </nav>
+            </div>
+
+            <!-- Summary Cards -->
+            <div class="row mb-4">
+                <div class="col-xl-3 col-md-6 mb-4">
+                    <div class="card border-left-primary shadow h-100 py-2">
+                        <div class="card-body">
+                            <div class="row no-gutters align-items-center">
+                                <div class="col mr-2">
+                                    <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">
+                                        Total Corps Members</div>
+                                    <div class="h5 mb-0 font-weight-bold text-gray-800">{{ total_users }}</div>
+                                </div>
+                                <div class="col-auto">
+                                    <i class="fas fa-users fa-2x text-gray-300"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-xl-3 col-md-6 mb-4">
+                    <div class="card border-left-success shadow h-100 py-2">
+                        <div class="card-body">
+                            <div class="row no-gutters align-items-center">
+                                <div class="col mr-2">
+                                    <div class="text-xs font-weight-bold text-success text-uppercase mb-1">
+                                        Present Today</div>
+                                    <div class="h5 mb-0 font-weight-bold text-gray-800">{{ present_today }}</div>
+                                </div>
+                                <div class="col-auto">
+                                    <i class="fas fa-check-circle fa-2x text-gray-300"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-xl-3 col-md-6 mb-4">
+                    <div class="card border-left-info shadow h-100 py-2">
+                        <div class="card-body">
+                            <div class="row no-gutters align-items-center">
+                                <div class="col mr-2">
+                                    <div class="text-xs font-weight-bold text-info text-uppercase mb-1">
+                                        Attendance Rate</div>
+                                    <div class="row no-gutters align-items-center">
+                                        <div class="col-auto">
+                                            <div class="h5 mb-0 mr-3 font-weight-bold text-gray-800">{{ attendance_rate }}%</div>
+                                        </div>
+                                        <div class="col">
+                                            <div class="progress progress-sm mr-2">
+                                                <div class="progress-bar bg-info" role="progressbar"
+                                                     style="width: {{ attendance_rate }}%" 
+                                                     aria-valuenow="{{ attendance_rate }}" 
+                                                     aria-valuemin="0" aria-valuemax="100"></div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-auto">
+                                    <i class="fas fa-percentage fa-2x text-gray-300"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-xl-3 col-md-6 mb-4">
+                    <div class="card border-left-warning shadow h-100 py-2">
+                        <div class="card-body">
+                            <div class="row no-gutters align-items-center">
+                                <div class="col mr-2">
+                                    <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">
+                                        Active Locations</div>
+                                    <div class="h5 mb-0 font-weight-bold text-gray-800">{{ active_locations }}</div>
+                                </div>
+                                <div class="col-auto">
+                                    <i class="fas fa-map-marker-alt fa-2x text-gray-300"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Report Generation Section -->
+            <div class="row">
+                <!-- Attendance Reports -->
+                <div class="col-lg-6 mb-4">
+                    <div class="card shadow">
+                        <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+                            <h6 class="m-0 font-weight-bold text-primary">
+                                <i class="fas fa-calendar-check me-2"></i>Attendance Reports
+                            </h6>
+                        </div>
+                        <div class="card-body">
+                            <form id="attendanceReportForm" action="{{ url_for('admin.generate_attendance_report') }}" method="POST">
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <label for="attendance_date_from" class="form-label">From Date</label>
+                                        <input type="date" class="form-control" id="attendance_date_from" 
+                                               name="date_from" value="{{ default_date_from }}">
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <label for="attendance_date_to" class="form-label">To Date</label>
+                                        <input type="date" class="form-control" id="attendance_date_to" 
+                                               name="date_to" value="{{ default_date_to }}">
+                                    </div>
+                                </div>
+                                
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <label for="attendance_location" class="form-label">Location (Optional)</label>
+                                        <select class="form-select" id="attendance_location" name="location_id">
+                                            <option value="">All Locations</option>
+                                            {% for location in locations %}
+                                            <option value="{{ location.id }}">{{ location.name }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <label for="attendance_status" class="form-label">Status (Optional)</label>
+                                        <select class="form-select" id="attendance_status" name="status">
+                                            <option value="">All Statuses</option>
+                                            <option value="present">Present</option>
+                                            <option value="late">Late</option>
+                                            <option value="very_late">Very Late</option>
+                                            <option value="absent">Absent</option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label for="attendance_format" class="form-label">Export Format</label>
+                                    <select class="form-select" id="attendance_format" name="format">
+                                        <option value="csv">CSV File</option>
+                                        <option value="excel">Excel File</option>
+                                        <option value="pdf">PDF Report</option>
+                                    </select>
+                                </div>
+
+                                <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                                    <button type="submit" class="btn btn-primary">
+                                        <i class="fas fa-download me-2"></i>Generate Report
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- User Reports -->
+                <div class="col-lg-6 mb-4">
+                    <div class="card shadow">
+                        <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+                            <h6 class="m-0 font-weight-bold text-success">
+                                <i class="fas fa-users me-2"></i>User Reports
+                            </h6>
+                        </div>
+                        <div class="card-body">
+                            <form id="userReportForm" action="{{ url_for('admin.generate_user_report') }}" method="POST">
+                                <div class="mb-3">
+                                    <label for="user_report_type" class="form-label">Report Type</label>
+                                    <select class="form-select" id="user_report_type" name="report_type">
+                                        <option value="all_users">All Users</option>
+                                        <option value="active_users">Active Users Only</option>
+                                        <option value="inactive_users">Inactive Users Only</option>
+                                        <option value="users_with_face">Users with Face Data</option>
+                                        <option value="users_without_face">Users without Face Data</option>
+                                    </select>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label for="user_state_filter" class="form-label">State Filter (Optional)</label>
+                                    <select class="form-select" id="user_state_filter" name="state_filter">
+                                        <option value="">All States</option>
+                                        {% for state in states %}
+                                        <option value="{{ state }}">{{ state }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label for="user_format" class="form-label">Export Format</label>
+                                    <select class="form-select" id="user_format" name="format">
+                                        <option value="csv">CSV File</option>
+                                        <option value="excel">Excel File</option>
+                                        <option value="pdf">PDF Report</option>
+                                    </select>
+                                </div>
+
+                                <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                                    <button type="submit" class="btn btn-success">
+                                        <i class="fas fa-download me-2"></i>Generate Report
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row">
+                <!-- Location Reports -->
+                <div class="col-lg-6 mb-4">
+                    <div class="card shadow">
+                        <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+                            <h6 class="m-0 font-weight-bold text-info">
+                                <i class="fas fa-map-marker-alt me-2"></i>Location Reports
+                            </h6>
+                        </div>
+                        <div class="card-body">
+                            <form id="locationReportForm" action="{{ url_for('admin.generate_location_report') }}" method="POST">
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <label for="location_date_from" class="form-label">From Date</label>
+                                        <input type="date" class="form-control" id="location_date_from" 
+                                               name="date_from" value="{{ default_date_from }}">
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <label for="location_date_to" class="form-label">To Date</label>
+                                        <input type="date" class="form-control" id="location_date_to" 
+                                               name="date_to" value="{{ default_date_to }}">
+                                    </div>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label for="location_specific" class="form-label">Specific Location (Optional)</label>
+                                    <select class="form-select" id="location_specific" name="location_id">
+                                        <option value="">All Locations</option>
+                                        {% for location in locations %}
+                                        <option value="{{ location.id }}">{{ location.name }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label for="location_format" class="form-label">Export Format</label>
+                                    <select class="form-select" id="location_format" name="format">
+                                        <option value="csv">CSV File</option>
+                                        <option value="excel">Excel File</option>
+                                        <option value="pdf">PDF Report</option>
+                                    </select>
+                                </div>
+
+                                <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                                    <button type="submit" class="btn btn-info">
+                                        <i class="fas fa-download me-2"></i>Generate Report
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Summary Reports -->
+                <div class="col-lg-6 mb-4">
+                    <div class="card shadow">
+                        <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+                            <h6 class="m-0 font-weight-bold text-warning">
+                                <i class="fas fa-chart-pie me-2"></i>Summary Reports
+                            </h6>
+                        </div>
+                        <div class="card-body">
+                            <form id="summaryReportForm" action="{{ url_for('admin.generate_summary_report') }}" method="POST">
+                                <div class="mb-3">
+                                    <label for="summary_report_type" class="form-label">Report Type</label>
+                                    <select class="form-select" id="summary_report_type" name="report_type">
+                                        <option value="daily_summary">Daily Summary</option>
+                                        <option value="weekly_summary">Weekly Summary</option>
+                                        <option value="monthly_summary">Monthly Summary</option>
+                                        <option value="custom_range">Custom Date Range</option>
+                                    </select>
+                                </div>
+
+                                <div class="row" id="customDateRange" style="display: none;">
+                                    <div class="col-md-6 mb-3">
+                                        <label for="summary_date_from" class="form-label">From Date</label>
+                                        <input type="date" class="form-control" id="summary_date_from" 
+                                               name="date_from" value="{{ default_date_from }}">
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <label for="summary_date_to" class="form-label">To Date</label>
+                                        <input type="date" class="form-control" id="summary_date_to" 
+                                               name="date_to" value="{{ default_date_to }}">
+                                    </div>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label for="summary_format" class="form-label">Export Format</label>
+                                    <select class="form-select" id="summary_format" name="format">
+                                        <option value="pdf">PDF Report</option>
+                                        <option value="excel">Excel File</option>
+                                        <option value="csv">CSV File</option>
+                                    </select>
+                                </div>
+
+                                <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                                    <button type="submit" class="btn btn-warning">
+                                        <i class="fas fa-download me-2"></i>Generate Report
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Quick Actions -->
+            <div class="row">
+                <div class="col-12">
+                    <div class="card shadow">
+                        <div class="card-header py-3">
+                            <h6 class="m-0 font-weight-bold text-primary">
+                                <i class="fas fa-bolt me-2"></i>Quick Actions
+                            </h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-3 mb-3">
+                                    <a href="{{ url_for('admin.generate_daily_report') }}" class="btn btn-outline-primary btn-block">
+                                        <i class="fas fa-calendar-day me-2"></i>Today's Report
+                                    </a>
+                                </div>
+                                <div class="col-md-3 mb-3">
+                                    <a href="{{ url_for('admin.generate_weekly_report') }}" class="btn btn-outline-success btn-block">
+                                        <i class="fas fa-calendar-week me-2"></i>This Week's Report
+                                    </a>
+                                </div>
+                                <div class="col-md-3 mb-3">
+                                    <a href="{{ url_for('admin.generate_monthly_report') }}" class="btn btn-outline-info btn-block">
+                                        <i class="fas fa-calendar-alt me-2"></i>This Month's Report
+                                    </a>
+                                </div>
+                                <div class="col-md-3 mb-3">
+                                    <a href="{{ url_for('admin.send_daily_summary_email') }}" class="btn btn-outline-warning btn-block">
+                                        <i class="fas fa-envelope me-2"></i>Email Daily Summary
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Show/hide custom date range for summary reports
+    const summaryReportType = document.getElementById('summary_report_type');
+    const customDateRange = document.getElementById('customDateRange');
+    
+    summaryReportType.addEventListener('change', function() {
+        if (this.value === 'custom_range') {
+            customDateRange.style.display = 'block';
+        } else {
+            customDateRange.style.display = 'none';
+        }
+    });
+
+    // Form validation
+    document.querySelectorAll('form').forEach(form => {
+        form.addEventListener('submit', function(e) {
+            const dateFrom = this.querySelector('[name="date_from"]');
+            const dateTo = this.querySelector('[name="date_to"]');
+            
+            if (dateFrom && dateTo && dateFrom.value && dateTo.value) {
+                if (new Date(dateFrom.value) > new Date(dateTo.value)) {
+                    e.preventDefault();
+                    alert('From date cannot be later than To date.');
+                    return false;
+                }
+            }
+        });
+    });
+});
+</script>
+{% endblock %}

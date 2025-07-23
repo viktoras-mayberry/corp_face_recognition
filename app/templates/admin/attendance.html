@@ -9,17 +9,12 @@
         Attendance Records
     </h1>
     <div class="btn-toolbar mb-2 mb-md-0">
-        <div class="btn-group me-2">
-            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="printReport()">
-                <i class="fas fa-print"></i> Print
-            </button>
-            <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#exportModal">
-                <i class="fas fa-download"></i> Export
-            </button>
-        </div>
         <button type="button" class="btn btn-sm btn-primary" onclick="openAddAttendance()">
             <i class="fas fa-plus"></i> Add Record
         </button>
+        <a href="{{ url_for('admin.reports') }}" class="btn btn-sm btn-outline-success ms-2">
+            <i class="fas fa-chart-line"></i> View Reports
+        </a>
     </div>
 </div>
 
@@ -257,12 +252,9 @@
                     <i class="fas fa-trash"></i> Delete Selected
                 </button>
             </form>
-            <form id="bulkExportForm" method="GET" action="{{ url_for('admin.export_attendance') }}" style="display:inline;">
-                <input type="hidden" name="ids" id="bulkExportIds">
-                <button type="submit" class="btn btn-success btn-sm">
-                    <i class="fas fa-download"></i> Export Selected
-                </button>
-            </form>
+            <a href="{{ url_for('admin.reports') }}" class="btn btn-success btn-sm">
+                <i class="fas fa-chart-line"></i> Generate Reports
+            </a>
         </div>
     </div>
 </div>
@@ -276,43 +268,6 @@
     </div>
 </div>
 
-<!-- Export Modal -->
-<div class="modal fade" id="exportModal" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">Export Attendance Records</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <form method="GET" action="{{ url_for('admin.export_attendance') }}">
-                    <div class="mb-3">
-                        <label for="export_format" class="form-label">Export Format</label>
-                        <select class="form-select" id="export_format" name="format">
-                            <option value="csv">CSV</option>
-                            <option value="excel">Excel</option>
-                            <option value="pdf">PDF</option>
-                        </select>
-                    </div>
-                    <div class="mb-3">
-                        <label for="export_date_from" class="form-label">From Date</label>
-                        <input type="date" class="form-control" id="export_date_from" name="date_from">
-                    </div>
-                    <div class="mb-3">
-                        <label for="export_date_to" class="form-label">To Date</label>
-                        <input type="date" class="form-control" id="export_date_to" name="date_to">
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                        <button type="submit" class="btn btn-success">
-                            <i class="fas fa-download me-1"></i> Export
-                        </button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
-</div>
 
 <!-- Edit Attendance Modal (loaded via AJAX) -->
 <div class="modal fade" id="editAttendanceModal" tabindex="-1">
@@ -325,11 +280,9 @@
 
 <!-- Analytics Dashboard -->
 <div class="card mb-4">
-    <div class="card-header d-flex justify-content-between align-items-center">
+    <div class="card-header">
         <h5 class="mb-0"><i class="fas fa-chart-bar me-2"></i>Attendance Analytics</h5>
-        <button class="btn btn-outline-success btn-sm" onclick="window.print()">
-            <i class="fas fa-file-download me-1"></i> Download Report
-        </button>
+        <small class="text-muted">For detailed reports and exports, visit the <a href="{{ url_for('admin.reports') }}">Reports section</a></small>
     </div>
     <div class="card-body">
         <div class="row">
@@ -456,7 +409,6 @@
     const bulkBar = document.getElementById('bulkActionsBar');
     const selectedCount = document.getElementById('selectedCount');
     const bulkDeleteIds = document.getElementById('bulkDeleteIds');
-    const bulkExportIds = document.getElementById('bulkExportIds');
     function updateBulkBar() {
         const checked = Array.from(document.querySelectorAll('.record-checkbox:checked'));
         if (checked.length > 0) {
@@ -464,12 +416,10 @@
             selectedCount.textContent = checked.length;
             const ids = checked.map(cb => cb.value).join(',');
             bulkDeleteIds.value = ids;
-            bulkExportIds.value = ids;
         } else {
             bulkBar.classList.add('d-none');
             selectedCount.textContent = 0;
             bulkDeleteIds.value = '';
-            bulkExportIds.value = '';
         }
     }
     if (selectAll) {

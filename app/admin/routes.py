@@ -449,8 +449,327 @@ def export_attendance():
 @login_required
 @admin_required
 def reports():
-    """Generate reports"""
-    return render_template('admin/reports.html')
+    """Generate reports dashboard"""
+    from datetime import date, timedelta
+    from sqlalchemy import distinct
+    
+    # Get statistics for dashboard
+    total_users = User.query.filter_by(is_admin=False).count()
+    present_today = Attendance.query.filter(
+        Attendance.attendance_date == date.today()
+    ).count()
+    attendance_rate = round((present_today / total_users * 100) if total_users > 0 else 0, 1)
+    active_locations = Location.query.filter_by(is_active=True).count()
+    
+    # Get all locations and local governments for dropdowns
+    locations = Location.query.order_by(Location.name).all()
+    local_governments = db.session.query(distinct(User.local_government)).filter(
+        User.local_government.isnot(None), User.local_government != ''
+    ).order_by(User.local_government).all()
+    local_governments = [lg[0] for lg in local_governments]
+    
+    # Get all unique states from state codes for dropdowns
+    states_query = db.session.query(distinct(User.state_code)).filter(
+        User.state_code.isnot(None), User.state_code != ''
+    ).order_by(User.state_code).all()
+    states = [state[0].split('/')[0] if '/' in state[0] else state[0] for state in states_query]
+    states = sorted(list(set(states)))  # Remove duplicates and sort
+    
+    # Default date range (last 30 days)
+    default_date_to = date.today()
+    default_date_from = default_date_to - timedelta(days=30)
+    
+    return render_template('admin/reports.html',
+                         total_users=total_users,
+                         present_today=present_today,
+                         attendance_rate=attendance_rate,
+                         active_locations=active_locations,
+                         locations=locations,
+                         local_governments=local_governments,
+                         states=states,
+                         default_date_from=default_date_from.isoformat(),
+                         default_date_to=default_date_to.isoformat())
+
+# Report Generation Routes
+@bp.route('/reports/attendance', methods=['POST'])
+@login_required
+@admin_required
+def generate_attendance_report():
+    """Generate attendance report"""
+    try:
+        date_from = request.form.get('date_from')
+        date_to = request.form.get('date_to')
+        location_id = request.form.get('location_id')
+        status = request.form.get('status')
+        format = request.form.get('format', 'csv')
+        
+        # Build query
+        query = Attendance.query.join(User).join(Location)
+        if date_from:
+            query = query.filter(Attendance.attendance_date >= date_from)
+        if date_to:
+            query = query.filter(Attendance.attendance_date <= date_to)
+        if location_id:
+            query = query.filter(Attendance.location_id == location_id)
+        if status:
+            query = query.filter(Attendance.status == status)
+            
+        records = query.order_by(Attendance.attendance_date.desc()).all()
+        
+        if format == 'csv':
+            def generate():
+                yield 'Date,Corps Member,State Code,Location,Check-in,Check-out,Status,Method\n'
+                for r in records:
+                    yield f'{r.attendance_date},{r.user.full_name},{r.user.state_code},{r.location.name if r.location else "N/A"},{r.check_in_time or ""},{r.check_out_time or ""},{r.status},{r.recognition_method}\n'
+            return Response(generate(), mimetype='text/csv', 
+                          headers={"Content-Disposition": "attachment;filename=attendance_report.csv"})
+        else:
+            flash('Excel and PDF formats coming soon!', 'info')
+            return redirect(url_for('admin.reports'))
+            
+    except Exception as e:
+        flash(f'Error generating report: {str(e)}', 'error')
+        return redirect(url_for('admin.reports'))
+
+@bp.route('/reports/users', methods=['POST'])
+@login_required
+@admin_required
+def generate_user_report():
+    """Generate user report"""
+    try:
+        report_type = request.form.get('report_type')
+        state_filter = request.form.get('state_filter')
+        format = request.form.get('format', 'csv')
+        
+        # Build query based on report type
+        query = User.query.filter_by(is_admin=False)
+        
+        if report_type == 'active_users':
+            query = query.filter_by(is_active=True)
+        elif report_type == 'inactive_users':
+            query = query.filter_by(is_active=False)
+        elif report_type == 'users_with_face':
+            query = query.filter(User.face_encoding.isnot(None))
+        elif report_type == 'users_without_face':
+            query = query.filter(User.face_encoding.is_(None))
+            
+        if state_filter:
+            query = query.filter(User.state == state_filter)
+            
+        users = query.order_by(User.full_name).all()
+        
+        if format == 'csv':
+            def generate():
+                yield 'State Code,Full Name,Email,Phone,PPA,Local Government,Active,Has Face Data,Created\n'
+                for u in users:
+                    yield f'{u.state_code},{u.full_name},{u.email},{u.phone or ""},{u.ppa_name or ""},{u.local_government or ""},{"Yes" if u.is_active else "No"},{"Yes" if u.face_encoding else "No"},{u.created_at.strftime("%Y-%m-%d")}\n'
+            return Response(generate(), mimetype='text/csv',
+                          headers={"Content-Disposition": "attachment;filename=users_report.csv"})
+        else:
+            flash('Excel and PDF formats coming soon!', 'info')
+            return redirect(url_for('admin.reports'))
+            
+    except Exception as e:
+        flash(f'Error generating user report: {str(e)}', 'error')
+        return redirect(url_for('admin.reports'))
+
+@bp.route('/reports/locations', methods=['POST'])
+@login_required
+@admin_required
+def generate_location_report():
+    """Generate location report"""
+    try:
+        date_from = request.form.get('date_from')
+        date_to = request.form.get('date_to')
+        location_id = request.form.get('location_id')
+        format = request.form.get('format', 'csv')
+        
+        # Get locations with attendance data
+        locations = Location.query.all()
+        if location_id:
+            locations = [Location.query.get(location_id)]
+            
+        if format == 'csv':
+            def generate():
+                yield 'Location,Address,State,Total Attendance,Date Range\n'
+                for loc in locations:
+                    query = Attendance.query.filter_by(location_id=loc.id)
+                    if date_from:
+                        query = query.filter(Attendance.attendance_date >= date_from)
+                    if date_to:
+                        query = query.filter(Attendance.attendance_date <= date_to)
+                    total_attendance = query.count()
+                    date_range = f'{date_from} to {date_to}' if date_from and date_to else 'All dates'
+                    yield f'{loc.name},{loc.address or ""},{loc.state},{total_attendance},{date_range}\n'
+            return Response(generate(), mimetype='text/csv',
+                          headers={"Content-Disposition": "attachment;filename=locations_report.csv"})
+        else:
+            flash('Excel and PDF formats coming soon!', 'info')
+            return redirect(url_for('admin.reports'))
+            
+    except Exception as e:
+        flash(f'Error generating location report: {str(e)}', 'error')
+        return redirect(url_for('admin.reports'))
+
+@bp.route('/reports/summary', methods=['POST'])
+@login_required
+@admin_required
+def generate_summary_report():
+    """Generate summary report"""
+    try:
+        report_type = request.form.get('report_type')
+        date_from = request.form.get('date_from')
+        date_to = request.form.get('date_to')
+        format = request.form.get('format', 'pdf')
+        
+        from datetime import date, timedelta
+        
+        # Determine date range based on report type
+        if report_type == 'daily_summary':
+            target_date = date.today()
+            date_from = date_to = target_date.isoformat()
+        elif report_type == 'weekly_summary':
+            target_date = date.today()
+            start_of_week = target_date - timedelta(days=target_date.weekday())
+            date_from = start_of_week.isoformat()
+            date_to = target_date.isoformat()
+        elif report_type == 'monthly_summary':
+            target_date = date.today()
+            start_of_month = target_date.replace(day=1)
+            date_from = start_of_month.isoformat()
+            date_to = target_date.isoformat()
+        
+        # Generate summary statistics
+        query = Attendance.query.join(User)
+        if date_from:
+            query = query.filter(Attendance.attendance_date >= date_from)
+        if date_to:
+            query = query.filter(Attendance.attendance_date <= date_to)
+            
+        attendances = query.all()
+        total_present = len(attendances)
+        on_time = len([a for a in attendances if a.status == 'present'])
+        late = len([a for a in attendances if a.status == 'late'])
+        very_late = len([a for a in attendances if a.status == 'very_late'])
+        
+        total_users = User.query.filter_by(is_admin=False, is_active=True).count()
+        attendance_rate = (total_present / total_users * 100) if total_users > 0 else 0
+        
+        if format == 'csv':
+            def generate():
+                yield f'Summary Report - {report_type.replace("_", " ").title()}\n'
+                yield f'Date Range,{date_from} to {date_to}\n'
+                yield f'Total Present,{total_present}\n'
+                yield f'On Time,{on_time}\n'
+                yield f'Late,{late}\n'
+                yield f'Very Late,{very_late}\n'
+                yield f'Attendance Rate,{attendance_rate:.1f}%\n'
+            return Response(generate(), mimetype='text/csv',
+                          headers={"Content-Disposition": "attachment;filename=summary_report.csv"})
+        else:
+            flash('PDF and Excel formats coming soon!', 'info')
+            return redirect(url_for('admin.reports'))
+            
+    except Exception as e:
+        flash(f'Error generating summary report: {str(e)}', 'error')
+        return redirect(url_for('admin.reports'))
+
+# Quick Report Routes
+@bp.route('/reports/daily')
+@login_required
+@admin_required
+def generate_daily_report():
+    """Generate today's attendance report"""
+    try:
+        today = date.today()
+        attendances = Attendance.query.filter_by(attendance_date=today).join(User).join(Location).all()
+        
+        def generate():
+            yield f'Daily Attendance Report - {today.strftime("%B %d, %Y")}\n'
+            yield 'Corps Member,State Code,Location,Check-in Time,Status\n'
+            for a in attendances:
+                yield f'{a.user.full_name},{a.user.state_code},{a.location.name},{a.check_in_time.strftime("%H:%M") if a.check_in_time else "N/A"},{a.status}\n'
+                
+        return Response(generate(), mimetype='text/csv',
+                      headers={"Content-Disposition": f"attachment;filename=daily_report_{today.isoformat()}.csv"})
+        
+    except Exception as e:
+        flash(f'Error generating daily report: {str(e)}', 'error')
+        return redirect(url_for('admin.reports'))
+
+@bp.route('/reports/weekly')
+@login_required
+@admin_required
+def generate_weekly_report():
+    """Generate this week's attendance report"""
+    try:
+        today = date.today()
+        start_of_week = today - timedelta(days=today.weekday())
+        
+        attendances = Attendance.query.filter(
+            Attendance.attendance_date >= start_of_week,
+            Attendance.attendance_date <= today
+        ).join(User).join(Location).all()
+        
+        def generate():
+            yield f'Weekly Attendance Report - {start_of_week.strftime("%B %d")} to {today.strftime("%B %d, %Y")}\n'
+            yield 'Date,Corps Member,State Code,Location,Check-in Time,Status\n'
+            for a in attendances:
+                yield f'{a.attendance_date},{a.user.full_name},{a.user.state_code},{a.location.name},{a.check_in_time.strftime("%H:%M") if a.check_in_time else "N/A"},{a.status}\n'
+                
+        return Response(generate(), mimetype='text/csv',
+                      headers={"Content-Disposition": f"attachment;filename=weekly_report_{start_of_week.isoformat()}_to_{today.isoformat()}.csv"})
+        
+    except Exception as e:
+        flash(f'Error generating weekly report: {str(e)}', 'error')
+        return redirect(url_for('admin.reports'))
+
+@bp.route('/reports/monthly')
+@login_required
+@admin_required
+def generate_monthly_report():
+    """Generate this month's attendance report"""
+    try:
+        today = date.today()
+        start_of_month = today.replace(day=1)
+        
+        attendances = Attendance.query.filter(
+            Attendance.attendance_date >= start_of_month,
+            Attendance.attendance_date <= today
+        ).join(User).join(Location).all()
+        
+        def generate():
+            yield f'Monthly Attendance Report - {start_of_month.strftime("%B %Y")}\n'
+            yield 'Date,Corps Member,State Code,Location,Check-in Time,Status\n'
+            for a in attendances:
+                yield f'{a.attendance_date},{a.user.full_name},{a.user.state_code},{a.location.name},{a.check_in_time.strftime("%H:%M") if a.check_in_time else "N/A"},{a.status}\n'
+                
+        return Response(generate(), mimetype='text/csv',
+                      headers={"Content-Disposition": f"attachment;filename=monthly_report_{start_of_month.strftime('%Y-%m')}.csv"})
+        
+    except Exception as e:
+        flash(f'Error generating monthly report: {str(e)}', 'error')
+        return redirect(url_for('admin.reports'))
+
+@bp.route('/reports/email_summary')
+@login_required
+@admin_required
+def send_daily_summary_email():
+    """Send daily summary via email"""
+    try:
+        from app.services.notification_service import NotificationService
+        notification_service = NotificationService()
+        
+        success = notification_service.send_daily_attendance_report()
+        if success:
+            flash('Daily summary email sent successfully!', 'success')
+        else:
+            flash('Failed to send daily summary email. Please check email configuration.', 'error')
+            
+    except Exception as e:
+        flash(f'Error sending daily summary email: {str(e)}', 'error')
+        
+    return redirect(url_for('admin.reports'))
 
 @bp.route('/send_announcement', methods=['POST'])
 @login_required
